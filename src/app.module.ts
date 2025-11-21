@@ -4,6 +4,7 @@ import { AuthModule } from './modules/auth/auth.module'; // Importante!
 import { ServicesModule } from './modules/services/services.module';
 import { ProfessionalsModule } from './modules/professionals/professionals.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { ClientsModule } from './modules/clients/clients.module';
 
 @Module({
   imports: [
@@ -17,7 +18,9 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
     
     ProfessionalsModule,
     
-    AppointmentsModule, 
+    AppointmentsModule,
+    
+    ClientsModule, 
   ],
   controllers: [],
   providers: [],
