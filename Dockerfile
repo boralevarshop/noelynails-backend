@@ -1,7 +1,6 @@
 # 1. Etapa de Construção (Build)
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
-# Cria a pasta de trabalho dentro do container
 WORKDIR /app
 
 # Copia os arquivos de dependências
@@ -21,7 +20,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # 2. Etapa de Produção (A imagem final leve que vai pro servidor)
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -34,5 +33,5 @@ COPY --from=builder /app/prisma ./prisma
 # Porta que o container vai expor
 EXPOSE 3000
 
-# Comando que inicia o servidor
-CMD [  "sh", "-c", "npx prisma migrate deploy && npm run start:prod" ]
+# Comando MÁGICO: Roda a migração do banco e DEPOIS inicia o servidor
+CMD [ "sh", "-c", "npx prisma migrate deploy && npm run start:prod" ]
