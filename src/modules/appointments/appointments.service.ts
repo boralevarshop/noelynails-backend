@@ -57,11 +57,11 @@ export class AppointmentsService {
       data: {
         tenantId,
         clienteId: cliente.id,
-        profissionalId: professionalId,
-        servicoId: serviceId,
+        profissionalId: professionalId, // Mapeamento correto (PT-BR)
+        servicoId: serviceId,           // Mapeamento correto (PT-BR)
         dataHora: dataInicio,
         dataFim: dataFim,
-        status: 'CONFIRMADO',
+        status: 'CONFIRMADO',           // Já nasce confirmado
       },
       include: {
         cliente: true,
@@ -81,7 +81,8 @@ export class AppointmentsService {
     return await prisma.agendamento.findMany({
       where: { tenantId },
       include: { cliente: true, servico: true, profissional: true },
-      orderBy: { dataHora: 'desc' }
+      // Ordena do mais próximo para o mais distante
+      orderBy: { dataHora: 'asc' }
     });
   }
 
@@ -97,13 +98,15 @@ export class AppointmentsService {
       }
     });
 
-    // this.dispararWebhook(agendamento, 'cancelamento'); // Opcional agora
+    // Opcional: Avisar n8n sobre cancelamento
+    // this.dispararWebhook(agendamento, 'cancelamento');
 
     return agendamento;
   }
 
   private async dispararWebhook(dados: any, tipo: string) {
     try {
+        // URL do seu n8n
         const n8nUrl = `https://n8n.devhenri.shop/webhook-test/${tipo}`; 
         await lastValueFrom(this.httpService.post(n8nUrl, dados));
     } catch (error) {
