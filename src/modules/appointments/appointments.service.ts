@@ -31,13 +31,12 @@ export class AppointmentsService {
       cliente = await prisma.cliente.create({ data: { tenantId, nome: nomeCliente, telefone: telefoneCliente } });
     }
 
-    // Criação no Banco
     const agendamento = await prisma.agendamento.create({
       data: {
         tenantId,
         clienteId: cliente.id,
-        profissionalId: professionalId, // Nome correto da coluna no banco
-        servicoId: serviceId,           // Nome correto da coluna no banco
+        profissionalId: professionalId,
+        servicoId: serviceId,
         dataHora: dataInicio,
         dataFim: dataFim,
         status: 'CONFIRMADO',
@@ -50,18 +49,8 @@ export class AppointmentsService {
       }
     });
 
-    // Dispara Webhook do n8n
-    try {
-        // URL do seu n8n (confira se está correta)
-        const n8nUrl = 'https://n8n.devhenri.shop/webhook-test/novo-agendamento'; 
-        
-        await lastValueFrom(
-            this.httpService.post(n8nUrl, agendamento)
-        );
-        console.log('Enviado para n8n com sucesso!');
-    } catch (error) {
-        console.error('Erro ao chamar n8n:', error);
-    }
+    // Dispara n8n (Criação)
+    this.dispararWebhook(agendamento, 'novo-agendamento');
 
     return agendamento;
   }
@@ -72,5 +61,35 @@ export class AppointmentsService {
       include: { cliente: true, servico: true, profissional: true },
       orderBy: { dataHora: 'desc' }
     });
+  }
+
+  // --- NOVO: Função de Cancelar ---
+  async cancel(id: string) {
+    const agendamento = await prisma.agendamento.update({
+      where: { id },
+      data: { status: 'CANCELADO' },
+      include: {
+        cliente: true,
+        servico: true,
+        profissional: true,
+        tenant: true
+      }
+    });
+
+    // Dispara n8n (Cancelamento) - Futuramente podemos avisar o cliente que foi cancelado
+    // this.dispararWebhook(agendamento, 'cancelamento');
+
+    return agendamento;
+  }
+
+  // Função auxiliar para chamar o n8n
+  private async dispararWebhook(dados: any, tipo: string) {
+    try {
+        // URL do seu n8n
+        const n8nUrl = `https://n8n.devhenri.shop/webhook-test/${tipo}`; 
+        await lastValueFrom(this.httpService.post(n8nUrl, dados));
+    } catch (error) {
+        console.error('Erro ao chamar n8n:', error);
+    }
   }
 }

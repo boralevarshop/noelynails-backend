@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
 
 @Controller('appointments')
@@ -13,5 +13,11 @@ export class AppointmentsController {
   @Get('tenant/:tenantId')
   findAll(@Param('tenantId') tenantId: string) {
     return this.appointmentsService.findAllByTenant(tenantId);
+  }
+
+  // NOVA ROTA: Cancelar Agendamento
+  @Patch(':id/cancel')
+  cancel(@Param('id') id: string) {
+    return this.appointmentsService.cancel(id);
   }
 }
