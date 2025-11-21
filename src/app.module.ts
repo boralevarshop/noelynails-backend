@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module'; // Importante!
+import { ServicesModule } from './modules/services/services.module';
 
 @Module({
   imports: [
@@ -8,7 +9,9 @@ import { AuthModule } from './modules/auth/auth.module'; // Importante!
     ConfigModule.forRoot({ isGlobal: true }),
     
     // Carrega o módulo de autenticação que criamos
-    AuthModule, 
+    AuthModule,
+    
+    ServicesModule, 
   ],
   controllers: [],
   providers: [],
