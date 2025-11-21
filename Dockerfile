@@ -13,13 +13,15 @@ RUN npm install
 # Copia todo o resto do código
 COPY . .
 
-# Gera o cliente do Prisma (para o código entender o banco)
-RUN npx prisma generate
+# CORREÇÃO: Definimos uma URL fictícia (dummy) nesta linha.
+# O Prisma precisa dela apenas para validar o schema e gerar os arquivos.
+# Não se preocupe: ela não será usada para conectar no banco real.
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
-# Constrói o projeto NestJS (transforma TypeScript em JavaScript)
+# Constrói o projeto NestJS
 RUN npm run build
 
-# 2. Etapa de Produção (A imagem final leve que vai pro servidor)
+# 2. Etapa de Produção (Imagem final)
 FROM node:20-alpine
 
 WORKDIR /app
@@ -30,8 +32,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
-# Porta que o container vai expor
 EXPOSE 3000
 
-# Comando MÁGICO: Roda a migração do banco e DEPOIS inicia o servidor
+# Comando final: Roda a migração (usando a URL REAL do EasyPanel) e inicia
 CMD [ "sh", "-c", "npx prisma migrate deploy && npm run start:prod" ]
