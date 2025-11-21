@@ -1,0 +1,138 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TIPOS DE USUÁRIO
+enum Role {
+  ADMIN_GLOBAL
+  DONO_SALAO
+  PROFISSIONAL
+  CLIENTE
+}
+
+// STATUS DO AGENDAMENTO
+enum StatusAgendamento {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  CONCLUIDO
+}
+
+// --------------------------------------
+// TABELAS
+// --------------------------------------
+
+// SALÕES (TENANTS)
+model Tenant {
+  id            String   @id @default(uuid())
+  nome          String
+  slug          String   @unique // ex: "noely" (vai virar noely.devhenri.shop)
+  telefone      String?
+  logoUrl       String?
+  corPrimaria   String   @default("#000000")
+  plano         String   @default("FREE")
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  usuarios      Usuario[]
+  servicos      Servico[]
+  agendamentos  Agendamento[]
+  clientes      Cliente[]
+
+  @@map("tenants")
+}
+
+// USUÁRIOS (Dono, Profissionais, Admin)
+model Usuario {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  nome        String
+  email       String   @unique
+  senha       String
+  role        Role     @default(PROFISSIONAL)
+  telefone    String?
+  
+  // Disponibilidade (Ex: { "seg": ["09:00", "18:00"] })
+  horarios    Json?    
+
+  agendamentos Agendamento[] 
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+// SERVIÇOS (Corte, Manicure, etc)
+model Servico {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  nome        String
+  descricao   String?
+  preco       Decimal  @db.Decimal(10, 2)
+  duracaoMin  Int
+  ativo       Boolean  @default(true)
+
+  agendamentos Agendamento[]
+
+  @@map("servicos")
+}
+
+// CLIENTES FINAIS (Sem login, cadastrados via Zap)
+model Cliente {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  nome        String
+  telefone    String   // Identificador principal
+  email       String?
+  
+  agendamentos Agendamento[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, telefone]) // Cliente único por salão
+  @@map("clientes")
+}
+
+// AGENDAMENTOS
+model Agendamento {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  
+  clienteId     String
+  cliente       Cliente  @relation(fields: [clienteId], references: [id])
+  
+  profissionalId String
+  profissional   Usuario @relation(fields: [profissionalId], references: [id])
+  
+  servicoId     String
+  servico       Servico  @relation(fields: [servicoId], references: [id])
+  
+  dataHora      DateTime // Início
+  dataFim       DateTime // Fim calculado
+  
+  status        StatusAgendamento @default(PENDENTE)
+  observacoes   String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, dataHora])
+  @@map("agendamentos")
+}
