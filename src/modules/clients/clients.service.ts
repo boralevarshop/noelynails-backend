@@ -6,7 +6,6 @@ const prisma = new PrismaClient();
 @Injectable()
 export class ClientsService {
   
-  // Listar todos
   async findAllByTenant(tenantId: string) {
     return await prisma.cliente.findMany({
       where: { tenantId },
@@ -14,15 +13,13 @@ export class ClientsService {
     });
   }
 
-  // Editar Cliente
   async update(id: string, data: any) {
-    // Verifica se o telefone novo já existe em outro cliente (para evitar duplicatas)
     if (data.telefone) {
         const existe = await prisma.cliente.findFirst({
             where: { 
                 telefone: data.telefone, 
                 tenantId: data.tenantId,
-                id: { not: id } // Ignora o próprio cliente que está sendo editado
+                id: { not: id } 
             }
         });
         if (existe) {
@@ -40,20 +37,14 @@ export class ClientsService {
     });
   }
 
-  // Excluir Cliente
+  // --- CORREÇÃO: FORÇAR EXCLUSÃO ---
   async remove(id: string) {
-    // Verifica se tem agendamentos
-    const agendamentos = await prisma.agendamento.count({
+    // 1. Apaga TODO o histórico de agendamentos desse cliente primeiro
+    await prisma.agendamento.deleteMany({
         where: { clienteId: id }
     });
 
-    if (agendamentos > 0) {
-        // Opção A: Bloquear exclusão (Mais seguro)
-        throw new BadRequestException('Não é possível excluir cliente com agendamentos registrados.');
-        
-        // Opção B: Se quisesse apagar tudo, usaria deleteMany nos agendamentos antes.
-    }
-
+    // 2. Agora o cliente está livre para ser excluído
     return await prisma.cliente.delete({
       where: { id }
     });

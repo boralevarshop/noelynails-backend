@@ -6,11 +6,9 @@ const prisma = new PrismaClient();
 @Injectable()
 export class ProfessionalsService {
   
-  // Criar um novo profissional (Cria um Usuário com role PROFISSIONAL)
   async create(data: any) {
     const { nome, email, telefone, tenantId } = data;
 
-    // Verifica se email já existe
     const emailExiste = await prisma.usuario.findUnique({ where: { email } });
     if (emailExiste) {
       throw new BadRequestException('Este email já está cadastrado no sistema.');
@@ -21,14 +19,13 @@ export class ProfessionalsService {
         nome,
         email,
         telefone,
-        senha: '123', // Senha padrão inicial (futuramente eles podem mudar)
+        senha: '123', 
         role: 'PROFISSIONAL',
         tenantId,
       },
     });
   }
 
-  // Listar apenas os profissionais DESTE salão
   async findAllByTenant(tenantId: string) {
     return await prisma.usuario.findMany({
       where: {
@@ -38,8 +35,14 @@ export class ProfessionalsService {
     });
   }
 
-  // Deletar profissional
+  // --- CORREÇÃO: FORÇAR EXCLUSÃO ---
   async remove(id: string) {
+    // 1. Apaga todos os agendamentos vinculados a este profissional
+    await prisma.agendamento.deleteMany({
+        where: { profissionalId: id }
+    });
+
+    // 2. Exclui o usuário
     return await prisma.usuario.delete({
       where: { id },
     });
