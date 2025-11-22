@@ -15,9 +15,9 @@ export class AppointmentsController {
     return this.appointmentsService.findAllByTenant(tenantId);
   }
 
-  // NOVA ROTA: Cancelar Agendamento
+  // CORREÇÃO: Agora recebe o nome de quem cancelou
   @Patch(':id/cancel')
-  cancel(@Param('id') id: string) {
-    return this.appointmentsService.cancel(id);
+  cancel(@Param('id') id: string, @Body('nome') nome: string) {
+    return this.appointmentsService.cancel(id, nome);
   }
 }

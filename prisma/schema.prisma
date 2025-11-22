@@ -130,6 +130,10 @@ model Agendamento {
   status        StatusAgendamento @default(PENDENTE)
   observacoes   String?
 
+  // --- CAMPO NOVO PARA AUDITORIA ---
+  canceladoPor  String? 
+  // ---------------------------------
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
