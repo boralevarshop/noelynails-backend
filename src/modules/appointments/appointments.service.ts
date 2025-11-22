@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaClient, StatusAgendamento } from '@prisma/client'; // Adicionei StatusAgendamento
+import { PrismaClient, StatusAgendamento } from '@prisma/client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 
@@ -26,12 +26,12 @@ export class AppointmentsService {
     const dataInicio = new Date(dataHora);
     const dataFim = new Date(dataInicio.getTime() + servico.duracaoMin * 60000);
 
-    // TRAVA DE SEGURANÇA
+    // Trava de conflito
     const conflito = await prisma.agendamento.findFirst({
       where: {
         tenantId,
         profissionalId: professionalId,
-        status: { not: StatusAgendamento.CANCELADO }, // Uso do Enum mais seguro
+        status: { not: StatusAgendamento.CANCELADO },
         AND: [
           { dataHora: { lt: dataFim } },
           { dataFim: { gt: dataInicio } }
@@ -56,7 +56,7 @@ export class AppointmentsService {
         servicoId: serviceId,
         dataHora: dataInicio,
         dataFim: dataFim,
-        status: StatusAgendamento.CONFIRMADO, // Uso do Enum mais seguro
+        status: StatusAgendamento.CONFIRMADO,
       },
       include: {
         cliente: true,
@@ -79,7 +79,6 @@ export class AppointmentsService {
     });
   }
 
-  // Função de Cancelar com Auditoria
   async cancel(id: string, nomeCancelou: string) {
     const agendamento = await prisma.agendamento.update({
       where: { id },
@@ -102,8 +101,12 @@ export class AppointmentsService {
 
   private async dispararWebhook(dados: any, tipo: string) {
     try {
-        const n8nUrl = `https://n8n.devhenri.shop/webhook-test/${tipo}`; 
+        // --- CORREÇÃO: URL DE PRODUÇÃO (SEM -test) ---
+        const n8nUrl = `https://n8n.devhenri.shop/webhook/${tipo}`; 
+        // ---------------------------------------------
+        
         await lastValueFrom(this.httpService.post(n8nUrl, dados));
+        console.log(`Webhook ${tipo} disparado para ${n8nUrl}`);
     } catch (error) {
         console.error('Erro ao chamar n8n:', error);
     }
