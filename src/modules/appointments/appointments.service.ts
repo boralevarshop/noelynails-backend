@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaClient, StatusAgendamento } from '@prisma/client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { Cron, CronExpression } from '@nestjs/schedule'; // Importe do Cron
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 const prisma = new PrismaClient();
 
@@ -12,32 +12,21 @@ export class AppointmentsService {
   
   constructor(private readonly httpService: HttpService) {}
 
-  // --- ROTINA AUTOMÁTICA (Roda a cada 30 minutos) ---
+  // Rotina automática para concluir agendamentos antigos
   @Cron(CronExpression.EVERY_30_MINUTES)
   async handleCron() {
     this.logger.debug('Verificando agendamentos concluídos...');
-    
-    // Define o limite: Agora menos 1 hora (para dar uma margem)
     const limiteTempo = new Date();
     limiteTempo.setHours(limiteTempo.getHours() - 1);
 
-    const result = await prisma.agendamento.updateMany({
+    await prisma.agendamento.updateMany({
       where: {
         status: StatusAgendamento.CONFIRMADO,
-        dataFim: {
-          lt: limiteTempo // Se acabou antes desse limite
-        }
+        dataFim: { lt: limiteTempo }
       },
-      data: {
-        status: StatusAgendamento.CONCLUIDO
-      }
+      data: { status: StatusAgendamento.CONCLUIDO }
     });
-
-    if (result.count > 0) {
-        this.logger.debug(`${result.count} agendamentos marcados como CONCLUIDO.`);
-    }
   }
-  // ---------------------------------------------------
 
   async create(data: any) {
     const { 
@@ -99,10 +88,28 @@ export class AppointmentsService {
     return agendamento;
   }
 
-  async findAllByTenant(tenantId: string) {
+  // --- ATUALIZADO: Suporte a filtro de data ---
+  async findAllByTenant(tenantId: string, date?: string) {
+    const whereClause: any = { tenantId };
+
+    // Se enviou data (YYYY-MM-DD), filtra o dia inteiro
+    if (date) {
+      const inicioDia = new Date(`${date}T00:00:00.000Z`);
+      const fimDia = new Date(`${date}T23:59:59.999Z`);
+      
+      whereClause.dataHora = {
+        gte: inicioDia,
+        lte: fimDia
+      };
+    }
+
     return await prisma.agendamento.findMany({
-      where: { tenantId },
-      include: { cliente: true, servico: true, profissional: true },
+      where: whereClause,
+      include: {
+        cliente: true,
+        servico: true,
+        profissional: true 
+      },
       orderBy: { dataHora: 'asc' }
     });
   }
@@ -114,12 +121,7 @@ export class AppointmentsService {
         status: StatusAgendamento.CANCELADO,
         canceladoPor: nomeCancelou 
       },
-      include: {
-        cliente: true,
-        servico: true,
-        profissional: true,
-        tenant: true
-      }
+      include: { cliente: true, servico: true, profissional: true, tenant: true }
     });
     return agendamento;
   }
