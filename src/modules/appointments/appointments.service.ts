@@ -12,7 +12,7 @@ export class AppointmentsService {
   
   constructor(private readonly httpService: HttpService) {}
 
-  // Rotina automática para concluir agendamentos antigos
+  // Rotina automática (Cron Job)
   @Cron(CronExpression.EVERY_30_MINUTES)
   async handleCron() {
     this.logger.debug('Verificando agendamentos concluídos...');
@@ -88,14 +88,16 @@ export class AppointmentsService {
     return agendamento;
   }
 
-  // --- ATUALIZADO: Suporte a filtro de data ---
+  // --- CORREÇÃO AQUI: FUSO HORÁRIO BRASIL ---
   async findAllByTenant(tenantId: string, date?: string) {
     const whereClause: any = { tenantId };
 
-    // Se enviou data (YYYY-MM-DD), filtra o dia inteiro
     if (date) {
-      const inicioDia = new Date(`${date}T00:00:00.000Z`);
-      const fimDia = new Date(`${date}T23:59:59.999Z`);
+      // Forçamos o fuso -03:00 para garantir que o dia comece na hora certa do Brasil
+      // Dia 23 00:00 no Brasil = Dia 23 03:00 UTC.
+      // Assim, o agendamento do dia 22 21:00 (Dia 23 00:00 UTC) fica DE FORA.
+      const inicioDia = new Date(`${date}T00:00:00.000-03:00`);
+      const fimDia = new Date(`${date}T23:59:59.999-03:00`);
       
       whereClause.dataHora = {
         gte: inicioDia,
@@ -113,6 +115,7 @@ export class AppointmentsService {
       orderBy: { dataHora: 'asc' }
     });
   }
+  // ------------------------------------------
 
   async cancel(id: string, nomeCancelou: string) {
     const agendamento = await prisma.agendamento.update({
