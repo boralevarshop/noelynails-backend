@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client'; // Importe o Role do Prisma
 
 const prisma = new PrismaClient();
 
@@ -26,23 +26,24 @@ export class ProfessionalsService {
     });
   }
 
+  // --- CORREÇÃO AQUI ---
   async findAllByTenant(tenantId: string) {
     return await prisma.usuario.findMany({
       where: {
         tenantId: tenantId,
-        role: 'PROFISSIONAL',
+        // Aceita tanto PROFISSIONAL quanto DONO_SALAO na lista
+        role: { in: [Role.PROFISSIONAL, Role.DONO_SALAO] } 
       },
+      orderBy: { nome: 'asc' } // Ordena alfabeticamente para ficar bonito
     });
   }
+  // ---------------------
 
-  // --- CORREÇÃO: FORÇAR EXCLUSÃO ---
   async remove(id: string) {
-    // 1. Apaga todos os agendamentos vinculados a este profissional
     await prisma.agendamento.deleteMany({
         where: { profissionalId: id }
     });
 
-    // 2. Exclui o usuário
     return await prisma.usuario.delete({
       where: { id },
     });
