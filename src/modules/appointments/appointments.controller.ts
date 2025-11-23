@@ -10,10 +10,16 @@ export class AppointmentsController {
     return this.appointmentsService.create(data);
   }
 
-  // ATUALIZADO: Agora aceita um filtro opcional de data (?date=YYYY-MM-DD)
+  // Rota de busca diária (Resumo) e geral
   @Get('tenant/:tenantId')
   findAll(@Param('tenantId') tenantId: string, @Query('date') date?: string) {
     return this.appointmentsService.findAllByTenant(tenantId, date);
+  }
+
+  // Rota de Retenção (Agora sem parâmetro de dias, pois é automático)
+  @Get('retention/:tenantId')
+  findRetention(@Param('tenantId') tenantId: string) {
+    return this.appointmentsService.findRetentionCandidates(tenantId);
   }
 
   @Patch(':id/cancel')

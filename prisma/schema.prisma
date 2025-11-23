@@ -33,7 +33,7 @@ enum StatusAgendamento {
 model Tenant {
   id            String   @id @default(uuid())
   nome          String
-  slug          String   @unique // ex: "noely" (vai virar noely.devhenri.shop)
+  slug          String   @unique
   telefone      String?
   logoUrl       String?
   corPrimaria   String   @default("#000000")
@@ -50,7 +50,7 @@ model Tenant {
   @@map("tenants")
 }
 
-// USUÁRIOS (Dono, Profissionais, Admin)
+// USUÁRIOS
 model Usuario {
   id          String   @id @default(uuid())
   tenantId    String
@@ -61,8 +61,6 @@ model Usuario {
   senha       String
   role        Role     @default(PROFISSIONAL)
   telefone    String?
-  
-  // Disponibilidade (Ex: { "seg": ["09:00", "18:00"] })
   horarios    Json?    
 
   agendamentos Agendamento[] 
@@ -73,7 +71,7 @@ model Usuario {
   @@map("usuarios")
 }
 
-// SERVIÇOS (Corte, Manicure, etc)
+// SERVIÇOS
 model Servico {
   id          String   @id @default(uuid())
   tenantId    String
@@ -83,21 +81,25 @@ model Servico {
   descricao   String?
   preco       Decimal  @db.Decimal(10, 2)
   duracaoMin  Int
-  ativo       Boolean  @default(true)
+  
+  // --- NOVO CAMPO: DIAS PARA RETORNO ---
+  diasRetorno Int      @default(30) 
+  // ------------------------------------
 
+  ativo       Boolean  @default(true)
   agendamentos Agendamento[]
 
   @@map("servicos")
 }
 
-// CLIENTES FINAIS (Sem login, cadastrados via Zap)
+// CLIENTES
 model Cliente {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   
   nome        String
-  telefone    String   // Identificador principal
+  telefone    String   
   email       String?
   
   agendamentos Agendamento[]
@@ -105,7 +107,7 @@ model Cliente {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([tenantId, telefone]) // Cliente único por salão
+  @@unique([tenantId, telefone])
   @@map("clientes")
 }
 
@@ -124,15 +126,12 @@ model Agendamento {
   servicoId     String
   servico       Servico  @relation(fields: [servicoId], references: [id])
   
-  dataHora      DateTime // Início
-  dataFim       DateTime // Fim calculado
+  dataHora      DateTime 
+  dataFim       DateTime 
   
   status        StatusAgendamento @default(PENDENTE)
   observacoes   String?
-
-  // --- CAMPO NOVO PARA AUDITORIA ---
-  canceladoPor  String? 
-  // ---------------------------------
+  canceladoPor  String?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
