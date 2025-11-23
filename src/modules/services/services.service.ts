@@ -8,16 +8,22 @@ export class ServicesService {
   
   // Criar um novo serviço
   async create(createServiceDto: any) {
-    // Garante que preço e duração sejam números
+    // Garante que os números sejam números
     const preco = parseFloat(createServiceDto.preco);
     const duracao = parseInt(createServiceDto.duracaoMin);
+    
+    // --- CORREÇÃO AQUI ---
+    // Pega o valor enviado ou usa 30 se não vier nada
+    const diasRetorno = createServiceDto.diasRetorno ? parseInt(createServiceDto.diasRetorno) : 30;
+    // ---------------------
 
     return await prisma.servico.create({
       data: {
         nome: createServiceDto.nome,
         preco: preco,
         duracaoMin: duracao,
-        tenantId: createServiceDto.tenantId, // Vincula ao salão
+        diasRetorno: diasRetorno, // Agora estamos salvando de verdade!
+        tenantId: createServiceDto.tenantId,
       },
     });
   }
@@ -29,6 +35,7 @@ export class ServicesService {
         tenantId: tenantId,
         ativo: true,
       },
+      orderBy: { nome: 'asc' } // Melhoria: Ordenar alfabeticamente
     });
   }
 
