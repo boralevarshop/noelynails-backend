@@ -46,6 +46,7 @@ model Tenant {
   servicos      Servico[]
   agendamentos  Agendamento[]
   clientes      Cliente[]
+  bloqueios     Bloqueio[] // <--- CORREÇÃO: Adicionado relação inversa
 
   @@map("tenants")
 }
@@ -64,6 +65,7 @@ model Usuario {
   horarios    Json?    
 
   agendamentos Agendamento[] 
+  bloqueios    Bloqueio[] // <--- CORREÇÃO: Adicionado relação inversa
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -81,10 +83,7 @@ model Servico {
   descricao   String?
   preco       Decimal  @db.Decimal(10, 2)
   duracaoMin  Int
-  
-  // --- NOVO CAMPO: DIAS PARA RETORNO ---
   diasRetorno Int      @default(30) 
-  // ------------------------------------
 
   ativo       Boolean  @default(true)
   agendamentos Agendamento[]
@@ -132,10 +131,29 @@ model Agendamento {
   status        StatusAgendamento @default(PENDENTE)
   observacoes   String?
   canceladoPor  String?
+  lembreteEnviado Boolean @default(false)
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([tenantId, dataHora])
   @@map("agendamentos")
+}
+
+// BLOQUEIOS DE AGENDA (Férias, Médico, Folga)
+model Bloqueio {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  
+  profissionalId String
+  profissional   Usuario  @relation(fields: [profissionalId], references: [id])
+  
+  inicio         DateTime
+  fim            DateTime
+  motivo         String? 
+
+  createdAt      DateTime @default(now())
+
+  @@map("bloqueios")
 }
