@@ -8,6 +8,7 @@ import { ServicesModule } from './modules/services/services.module';
 import { ProfessionalsModule } from './modules/professionals/professionals.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { UsersModule } from './modules/users/users.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { UsersModule } from './modules/users/users.module';
     ServicesModule,
     ProfessionalsModule,
     ClientsModule,
-    UsersModule
+    UsersModule,
+    TenantsModule
   ],
   controllers: [],
   providers: [],
