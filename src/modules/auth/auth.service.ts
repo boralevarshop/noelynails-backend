@@ -6,26 +6,39 @@ const prisma = new PrismaClient();
 @Injectable()
 export class AuthService {
   
-  // Função de Cadastro (Já estava aqui)
+  // --- CADASTRO COM DEGUSTAÇÃO PREMIUM (7 DIAS) ---
   async register(dados: any) {
     const { nomeSalao, slug, nomeSeu, email, telefone, senha } = dados;
 
+    // Validações de unicidade
     const slugExiste = await prisma.tenant.findUnique({ where: { slug } });
     if (slugExiste) throw new BadRequestException('Este link de salão já está em uso.');
 
     const emailExiste = await prisma.usuario.findUnique({ where: { email } });
     if (emailExiste) throw new BadRequestException('Este email já está cadastrado.');
 
+    // Calcula data de fim do trial (Hoje + 7 dias)
+    const hoje = new Date();
+    const dataFimTrial = new Date();
+    dataFimTrial.setDate(hoje.getDate() + 7);
+
+    // Cria o Tenant já como SUPREME (Degustação)
     const novoTenant = await prisma.tenant.create({
       data: {
         nome: nomeSalao,
         slug: slug,
         telefone: telefone,
+        
+        // Configuração do Trial
+        plano: 'SUPREME', 
+        statusAssinatura: 'TRIAL',
+        trialFim: dataFimTrial,
+
         usuarios: {
           create: {
             nome: nomeSeu,
             email: email,
-            senha: senha, // TODO: Criptografar futuramente
+            senha: senha, // TODO: Hash no futuro
             role: 'DONO_SALAO',
             telefone: telefone
           }
@@ -34,29 +47,26 @@ export class AuthService {
       include: { usuarios: true }
     });
 
-    return { sucesso: true, mensagem: 'Salão criado com sucesso!' };
+    return { 
+      sucesso: true, 
+      mensagem: 'Salão criado com 7 dias de Plano Supreme Grátis!',
+      tenantId: novoTenant.id 
+    };
   }
 
-  // --- NOVO: Função de Login ---
+  // --- LOGIN ---
   async login(dados: any) {
     const { email, senha } = dados;
 
-    // 1. Busca o usuário pelo email
     const usuario = await prisma.usuario.findUnique({
       where: { email },
-      include: { tenant: true } // Trazemos os dados do salão junto
+      include: { tenant: true }
     });
 
-    if (!usuario) {
+    if (!usuario || usuario.senha !== senha) {
       throw new UnauthorizedException('Email ou senha incorretos.');
     }
 
-    // 2. Verifica a senha (comparação simples por enquanto)
-    if (usuario.senha !== senha) {
-      throw new UnauthorizedException('Email ou senha incorretos.');
-    }
-
-    // 3. Retorna os dados do usuário para o painel salvar
     return {
       sucesso: true,
       usuario: {

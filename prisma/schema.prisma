@@ -31,22 +31,33 @@ enum StatusAgendamento {
 
 // SALÕES (TENANTS)
 model Tenant {
-  id            String   @id @default(uuid())
-  nome          String
-  slug          String   @unique
-  telefone      String?
-  logoUrl       String?
-  corPrimaria   String   @default("#000000")
-  plano         String   @default("FREE")
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String    @id @default(uuid())
+  nome             String
+  slug             String    @unique
+  telefone         String?
+  logoUrl          String?
+  corPrimaria      String    @default("#000000")
+  
+  // --- CAMPOS DE PLANOS E PAGAMENTO (FASE 8) ---
+  plano            String    @default("FREE")     // FREE, PRIME, SUPREME
+  asaasCustomerId  String?   // ID do cliente lá no Asaas
+  statusAssinatura String    @default("ACTIVE")   // TRIAL, ACTIVE, OVERDUE, CANCELED
+  trialFim         DateTime? // Data que acaba o teste grátis
+  // ---------------------------------------------
 
-  usuarios      Usuario[]
-  servicos      Servico[]
-  agendamentos  Agendamento[]
-  clientes      Cliente[]
-  bloqueios     Bloqueio[] // <--- CORREÇÃO: Adicionado relação inversa
+  // --- CAMPO DE WHATSAPP (INTEGRAÇÃO DINÂMICA) ---
+  whatsappInstance String?   // Nome da instância na Evolution API
+  // -----------------------------------------------
+
+  ativo            Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  usuarios         Usuario[]
+  servicos         Servico[]
+  agendamentos     Agendamento[]
+  clientes         Cliente[]
+  bloqueios        Bloqueio[]
 
   @@map("tenants")
 }
@@ -65,7 +76,7 @@ model Usuario {
   horarios    Json?    
 
   agendamentos Agendamento[] 
-  bloqueios    Bloqueio[] // <--- CORREÇÃO: Adicionado relação inversa
+  bloqueios    Bloqueio[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -112,35 +123,35 @@ model Cliente {
 
 // AGENDAMENTOS
 model Agendamento {
-  id            String   @id @default(uuid())
-  tenantId      String
-  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  id             String            @id @default(uuid())
+  tenantId       String
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
   
-  clienteId     String
-  cliente       Cliente  @relation(fields: [clienteId], references: [id])
+  clienteId      String
+  cliente        Cliente           @relation(fields: [clienteId], references: [id])
   
   profissionalId String
-  profissional   Usuario @relation(fields: [profissionalId], references: [id])
+  profissional   Usuario           @relation(fields: [profissionalId], references: [id])
   
-  servicoId     String
-  servico       Servico  @relation(fields: [servicoId], references: [id])
+  servicoId      String
+  servico        Servico           @relation(fields: [servicoId], references: [id])
   
-  dataHora      DateTime 
-  dataFim       DateTime 
+  dataHora       DateTime 
+  dataFim        DateTime 
   
-  status        StatusAgendamento @default(PENDENTE)
-  observacoes   String?
-  canceladoPor  String?
-  lembreteEnviado Boolean @default(false)
+  status         StatusAgendamento @default(PENDENTE)
+  observacoes    String?
+  canceladoPor   String?
+  lembreteEnviado Boolean          @default(false)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([tenantId, dataHora])
   @@map("agendamentos")
 }
 
-// BLOQUEIOS DE AGENDA (Férias, Médico, Folga)
+// BLOQUEIOS DE AGENDA
 model Bloqueio {
   id             String   @id @default(uuid())
   tenantId       String
