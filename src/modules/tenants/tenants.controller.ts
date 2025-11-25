@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Body, Delete } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 
 @Controller('tenants')
@@ -15,9 +15,19 @@ export class TenantsController {
     return this.tenantsService.findOne(id);
   }
 
-  // Rota para bloquear/desbloquear: PATCH /tenants/ID/toggle
   @Patch(':id/toggle')
   toggleStatus(@Param('id') id: string) {
     return this.tenantsService.toggleStatus(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() data: any) {
+    return this.tenantsService.update(id, data);
+  }
+
+  // --- NOVA ROTA DELETE ---
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return this.tenantsService.delete(id);
   }
 }
