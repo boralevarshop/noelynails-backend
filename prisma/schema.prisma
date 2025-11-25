@@ -32,16 +32,13 @@ model Tenant {
   logoUrl          String?
   corPrimaria      String    @default("#000000")
   
-  // --- PLANOS E PAGAMENTO ---
-  plano            String    @default("FREE")     // FREE, INDIVIDUAL, PRIME, SUPREME
+  plano            String    @default("FREE")
   asaasCustomerId  String?   
-  statusAssinatura String    @default("ACTIVE")   // TRIAL, ACTIVE, OVERDUE, CANCELED
+  statusAssinatura String    @default("ACTIVE")
   trialFim         DateTime? 
-  // --------------------------
-
   whatsappInstance String?   
-
   ativo            Boolean   @default(true)
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -65,10 +62,20 @@ model Usuario {
   senha       String
   role        Role     @default(PROFISSIONAL)
   telefone    String?
-  horarios    Json?    
+  
+  // --- NOVOS CAMPOS DE PERFIL ---
+  bio         String?  // Ex: "Especialista em Loiras"
+  instagram   String?  // Ex: "@ana.hair"
+  avatarUrl   String?  // URL da foto
+  
+  // Configurações
+  horarios    Json?    // { "seg": { "inicio": "09:00", "fim": "18:00" }, "ter": ... }
+  notificacoes Json?   // { "whatsapp": true }
 
-  agendamentos Agendamento[] 
-  bloqueios    Bloqueio[]
+  // Relacionamentos
+  agendamentos      Agendamento[] 
+  bloqueios         Bloqueio[]
+  servicosQueAtende Servico[] @relation("ProfissionalServicos") // Quem faz o quê
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -90,6 +97,9 @@ model Servico {
 
   ativo       Boolean  @default(true)
   agendamentos Agendamento[]
+  
+  // Relação inversa: Quais profissionais fazem este serviço?
+  profissionais Usuario[] @relation("ProfissionalServicos")
 
   @@map("servicos")
 }
@@ -99,13 +109,10 @@ model Cliente {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
   nome        String
   telefone    String   
   email       String?
-  
   agendamentos Agendamento[]
-
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -118,19 +125,15 @@ model Agendamento {
   id             String            @id @default(uuid())
   tenantId       String
   tenant         Tenant            @relation(fields: [tenantId], references: [id])
-  
   clienteId      String
   cliente        Cliente           @relation(fields: [clienteId], references: [id])
-  
   profissionalId String
   profissional   Usuario           @relation(fields: [profissionalId], references: [id])
-  
   servicoId      String
   servico        Servico           @relation(fields: [servicoId], references: [id])
   
   dataHora       DateTime 
   dataFim        DateTime 
-  
   status         StatusAgendamento @default(PENDENTE)
   observacoes    String?
   canceladoPor   String?
@@ -148,14 +151,11 @@ model Bloqueio {
   id             String   @id @default(uuid())
   tenantId       String
   tenant         Tenant   @relation(fields: [tenantId], references: [id])
-  
   profissionalId String
   profissional   Usuario  @relation(fields: [profissionalId], references: [id])
-  
   inicio         DateTime
   fim            DateTime
   motivo         String? 
-
   createdAt      DateTime @default(now())
 
   @@map("bloqueios")

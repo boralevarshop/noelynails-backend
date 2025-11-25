@@ -14,4 +14,10 @@ export class UsersController {
   updatePassword(@Param('id') id: string, @Body('senha') senha: string) {
     return this.usersService.updatePassword(id, senha);
   }
+
+  // --- NOVA ROTA ---
+  @Patch(':id')
+  updateProfile(@Param('id') id: string, @Body() data: any) {
+    return this.usersService.updateProfile(id, data);
+  }
 }
