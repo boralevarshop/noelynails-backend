@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -7,13 +8,20 @@ const prisma = new PrismaClient();
 export class AuthService {
   
   async register(dados: any) {
-    const { nomeSalao, slug, nomeSeu, email, telefone, senha } = dados;
-
-    const slugExiste = await prisma.tenant.findUnique({ where: { slug } });
-    if (slugExiste) throw new BadRequestException('Este link de salão já está em uso.');
+    const { nomeSalao, nomeSeu, email, telefone, senha } = dados;
 
     const emailExiste = await prisma.usuario.findUnique({ where: { email } });
     if (emailExiste) throw new BadRequestException('Este email já está cadastrado.');
+
+    // --- GERAÇÃO AUTOMÁTICA DO SLUG ---
+    let slug = this.gerarSlug(nomeSalao);
+    
+    // Verifica se já existe. Se existir, adiciona um código aleatório no final
+    const slugExiste = await prisma.tenant.findUnique({ where: { slug } });
+    if (slugExiste) {
+        slug = `${slug}-${randomBytes(2).toString('hex')}`; // Ex: noely-nails-a1b2
+    }
+    // ----------------------------------
 
     // Trial de 7 dias
     const hoje = new Date();
@@ -26,6 +34,7 @@ export class AuthService {
         slug: slug,
         telefone: telefone,
         
+        // Configuração do Trial
         plano: 'SUPREME', 
         statusAssinatura: 'TRIAL',
         trialFim: dataFimTrial,
@@ -34,7 +43,7 @@ export class AuthService {
           create: {
             nome: nomeSeu,
             email: email,
-            senha: senha,
+            senha: senha, // TODO: Hash no futuro
             role: 'DONO_SALAO',
             telefone: telefone
           }
@@ -46,7 +55,8 @@ export class AuthService {
     return { 
       sucesso: true, 
       mensagem: 'Salão criado com 7 dias de Plano Supreme Grátis!',
-      tenantId: novoTenant.id 
+      tenantId: novoTenant.id,
+      slug: novoTenant.slug
     };
   }
 
@@ -76,5 +86,19 @@ export class AuthService {
         }
       }
     };
+  }
+
+  // Função auxiliar para transformar "Salão da Jô" em "salao-da-jo"
+  private gerarSlug(texto: string): string {
+    return texto
+      .toString()
+      .toLowerCase()
+      .normalize('NFD') // Separa acentos
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/\s+/g, '-') // Espaço vira traço
+      .replace(/[^\w\-]+/g, '') // Remove caracteres especiais
+      .replace(/\-\-+/g, '-') // Remove traços duplicados
+      .replace(/^-+/, '') // Remove traço do começo
+      .replace(/-+$/, ''); // Remove traço do fim
   }
 }
