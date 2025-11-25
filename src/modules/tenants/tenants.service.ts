@@ -31,33 +31,36 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
+  // --- ATUALIZAR DADOS DO SALÃO (CORES, NOME, ETC) ---
   async update(id: string, data: any) {
+    // Se tentar mudar o slug, verifica se já existe
+    if (data.slug) {
+        const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
+        if (existe && existe.id !== id) {
+            throw new BadRequestException('Este link já está em uso por outro salão.');
+        }
+    }
+
     return await prisma.tenant.update({
       where: { id },
-      data: { ...data }
+      data: {
+        nome: data.nome,
+        slug: data.slug,
+        telefone: data.telefone,
+        corPrimaria: data.corPrimaria,
+        corSecundaria: data.corSecundaria,
+        whatsappInstance: data.whatsappInstance
+      }
     });
   }
+  // --------------------------------------------------
 
-  // --- NOVO: EXCLUSÃO TOTAL DO SALÃO ---
   async delete(id: string) {
-    // 1. Apaga Bloqueios
     await prisma.bloqueio.deleteMany({ where: { tenantId: id } });
-    
-    // 2. Apaga Agendamentos
     await prisma.agendamento.deleteMany({ where: { tenantId: id } });
-
-    // 3. Apaga Serviços
     await prisma.servico.deleteMany({ where: { tenantId: id } });
-
-    // 4. Apaga Clientes
     await prisma.cliente.deleteMany({ where: { tenantId: id } });
-
-    // 5. Apaga Usuários (Dono e Equipe)
     await prisma.usuario.deleteMany({ where: { tenantId: id } });
-
-    // 6. Finalmente, apaga o Salão
-    return await prisma.tenant.delete({
-      where: { id }
-    });
+    return await prisma.tenant.delete({ where: { id } });
   }
 }
