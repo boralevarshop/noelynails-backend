@@ -10,6 +10,13 @@ export class TenantsController {
     return this.tenantsService.findAll();
   }
 
+  // --- NOVA ROTA PÚBLICA ---
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.tenantsService.findBySlug(slug);
+  }
+  // ------------------------
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.tenantsService.findOne(id);
@@ -25,7 +32,6 @@ export class TenantsController {
     return this.tenantsService.update(id, data);
   }
 
-  // --- NOVA ROTA DELETE ---
   @Delete(':id')
   delete(@Param('id') id: string) {
     return this.tenantsService.delete(id);

@@ -31,9 +31,31 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
-  // --- ATUALIZAR DADOS DO SALÃO (AGORA COM TRIAL E PLANO) ---
+  // --- NOVO: BUSCAR POR SLUG (PÚBLICO) ---
+  async findBySlug(slug: string) {
+    const tenant = await prisma.tenant.findUnique({
+        where: { slug },
+        // Retorna apenas dados públicos (segurança)
+        select: {
+            id: true,
+            nome: true,
+            slug: true,
+            telefone: true,
+            corPrimaria: true,
+            corSecundaria: true,
+            logoUrl: true,
+            ativo: true
+        }
+    });
+
+    if (!tenant) throw new BadRequestException('Salão não encontrado.');
+    if (!tenant.ativo) throw new BadRequestException('Este salão está temporariamente indisponível.');
+
+    return tenant;
+  }
+  // ---------------------------------------
+
   async update(id: string, data: any) {
-    // Se tentar mudar o slug, verifica se já existe
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
         if (existe && existe.id !== id) {
@@ -48,16 +70,12 @@ export class TenantsService {
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
         whatsappInstance: data.whatsappInstance,
-        
-        // --- CORREÇÃO: CAMPOS QUE FALTAVAM ---
         plano: data.plano,
         statusAssinatura: data.statusAssinatura,
         trialFim: data.trialFim,
         asaasCustomerId: data.asaasCustomerId
-        // -------------------------------------
     };
 
-    // Remove chaves undefined para não apagar dados sem querer
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );
@@ -67,7 +85,6 @@ export class TenantsService {
       data: dadosAtualizar
     });
   }
-  // --------------------------------------------------
 
   async delete(id: string) {
     await prisma.bloqueio.deleteMany({ where: { tenantId: id } });
