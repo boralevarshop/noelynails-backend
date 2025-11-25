@@ -73,12 +73,9 @@ export class AppointmentsService {
 
     if (!serviceId || !professionalId || !dataHora) throw new BadRequestException('Dados incompletos.');
 
-    // --- CORREÇÃO DE SEGURANÇA ---
+    // 1. Validação do Plano
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    
-    if (!tenant) {
-        throw new BadRequestException('Salão não encontrado.');
-    }
+    if (!tenant) throw new BadRequestException('Salão não encontrado.');
 
     if (tenant.plano === 'FREE') {
         const hoje = new Date();
@@ -93,24 +90,64 @@ export class AppointmentsService {
         });
         if (totalMes >= 20) throw new BadRequestException('Limite de 20 agendamentos do plano Grátis atingido.');
     }
-    // -----------------------------
 
+    // 2. Busca Serviço
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
     if (!servico) throw new BadRequestException('Serviço não encontrado.');
 
     const dataInicio = new Date(dataHora);
     const dataFim = new Date(dataInicio.getTime() + servico.duracaoMin * 60000);
 
+    // 3. VALIDAÇÃO DE JORNADA DE TRABALHO
+    const profissional = await prisma.usuario.findUnique({ where: { id: professionalId } });
+    if (profissional && profissional.horarios) {
+        const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+        const diaSemana = diasMap[dataInicio.getDay()]; 
+        const configDia = (profissional.horarios as any)[diaSemana];
+
+        if (!configDia || !configDia.ativo) {
+            throw new BadRequestException(`O profissional ${profissional.nome} não atende neste dia da semana.`);
+        }
+
+        const minutosAgendamento = dataInicio.getHours() * 60 + dataInicio.getMinutes();
+        const [hIni, mIni] = configDia.inicio.split(':').map(Number);
+        const [hFim, mFim] = configDia.fim.split(':').map(Number);
+        
+        const inicioJornada = hIni * 60 + mIni;
+        const fimJornada = hFim * 60 + mFim;
+
+        if (minutosAgendamento < inicioJornada || minutosAgendamento >= fimJornada) {
+             throw new BadRequestException(`Horário fora do expediente de ${profissional.nome} (${configDia.inicio} às ${configDia.fim}).`);
+        }
+    }
+
+    // 4. VALIDAÇÃO DE BLOQUEIOS (CORRIGIDO AQUI)
+    const bloqueio = await prisma.bloqueio.findFirst({
+        where: {
+            profissionalId: professionalId, // Mapeando a variável certa
+            tenantId,
+            AND: [
+                { inicio: { lt: dataFim } },
+                { fim: { gt: dataInicio } }
+            ]
+        }
+    });
+
+    if (bloqueio) {
+        throw new BadRequestException(`Horário bloqueado para este profissional: ${bloqueio.motivo || 'Indisponível'}`);
+    }
+
+    // 5. VALIDAÇÃO DE CONFLITO (CORRIGIDO AQUI)
     const conflito = await prisma.agendamento.findFirst({
       where: {
         tenantId,
-        profissionalId: professionalId,
+        profissionalId: professionalId, // Mapeando a variável certa
         status: { not: StatusAgendamento.CANCELADO },
         AND: [ { dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } } ]
       }
     });
 
-    if (conflito) throw new BadRequestException('Este profissional já possui um agendamento neste horário!');
+    if (conflito) throw new BadRequestException('Este profissional já possui um cliente agendado neste horário!');
 
     let cliente = await prisma.cliente.findFirst({ where: { tenantId, telefone: telefoneCliente } });
     if (!cliente) {
@@ -161,11 +198,9 @@ export class AppointmentsService {
     try {
         const tenant = await prisma.tenant.findUnique({ where: { id: dados.tenantId } });
         
-        // --- CORREÇÃO DE SEGURANÇA DO WEBHOOK ---
-        if (!tenant) return; // Se não achou salão, para.
+        if (!tenant) return; 
         if (tenant.plano === 'FREE') return; 
         if (!tenant.whatsappInstance) return; 
-        // ----------------------------------------
 
         const payload = { ...dados, whatsappInstance: tenant.whatsappInstance };
         const n8nUrl = `https://n8n.devhenri.shop/webhook/${tipo}`; 
