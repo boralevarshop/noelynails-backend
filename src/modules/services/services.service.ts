@@ -7,39 +7,51 @@ const prisma = new PrismaClient();
 export class ServicesService {
   
   // Criar um novo serviço
-  async create(createServiceDto: any) {
-    // Garante que os números sejam números
-    const preco = parseFloat(createServiceDto.preco);
-    const duracao = parseInt(createServiceDto.duracaoMin);
-    
-    // --- CORREÇÃO AQUI ---
-    // Pega o valor enviado ou usa 30 se não vier nada
-    const diasRetorno = createServiceDto.diasRetorno ? parseInt(createServiceDto.diasRetorno) : 30;
-    // ---------------------
+  async create(data: any) {
+    const preco = parseFloat(data.preco);
+    const duracao = parseInt(data.duracaoMin);
+    const diasRetorno = data.diasRetorno ? parseInt(data.diasRetorno) : 30;
 
     return await prisma.servico.create({
       data: {
-        nome: createServiceDto.nome,
+        nome: data.nome,
         preco: preco,
         duracaoMin: duracao,
-        diasRetorno: diasRetorno, // Agora estamos salvando de verdade!
-        tenantId: createServiceDto.tenantId,
+        diasRetorno: diasRetorno,
+        tenantId: data.tenantId,
       },
     });
   }
 
-  // Listar todos os serviços de um salão específico
+  // Listar todos
   async findAllByTenant(tenantId: string) {
     return await prisma.servico.findMany({
       where: {
         tenantId: tenantId,
         ativo: true,
       },
-      orderBy: { nome: 'asc' } // Melhoria: Ordenar alfabeticamente
+      orderBy: { nome: 'asc' }
     });
   }
 
-  // Deletar (Desativar) um serviço
+  // --- NOVO: ATUALIZAR SERVIÇO ---
+  async update(id: string, data: any) {
+    const updateData: any = {
+        nome: data.nome,
+    };
+
+    if (data.preco) updateData.preco = parseFloat(data.preco);
+    if (data.duracaoMin) updateData.duracaoMin = parseInt(data.duracaoMin);
+    if (data.diasRetorno) updateData.diasRetorno = parseInt(data.diasRetorno);
+
+    return await prisma.servico.update({
+      where: { id },
+      data: updateData
+    });
+  }
+  // ------------------------------
+
+  // Deletar (Desativar)
   async remove(id: string) {
     return await prisma.servico.update({
       where: { id },
