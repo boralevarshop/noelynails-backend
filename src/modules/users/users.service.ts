@@ -14,7 +14,7 @@ export class UsersService {
     });
   }
 
-  // --- NOVO: Atualizar Perfil Completo ---
+  // Atualizar Perfil Completo (Dados, Serviços e Horários)
   async updateProfile(id: string, data: any) {
     return await prisma.usuario.update({
       where: { id },
@@ -23,16 +23,20 @@ export class UsersService {
         telefone: data.telefone,
         bio: data.bio,
         instagram: data.instagram,
-        // Atualiza os serviços que ele faz (limpa e reconecta)
+        avatarUrl: data.avatarUrl,
+        
+        // Atualiza Horários de Trabalho (JSON)
+        horarios: data.horarios,
+
+        // Atualiza os serviços que ele faz (limpa os antigos e conecta os novos)
         servicosQueAtende: data.servicosIds ? {
-            set: data.servicosIds.map((id: string) => ({ id }))
+            set: data.servicosIds.map((servicoId: string) => ({ id: servicoId }))
         } : undefined
       }
     });
   }
-  // --------------------------------------
 
-  // Buscar dados do usuário (incluindo serviços que ele faz)
+  // Buscar dados do usuário
   async findOne(id: string) {
     return await prisma.usuario.findUnique({
       where: { id },
