@@ -31,7 +31,7 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
-  // --- ATUALIZAR DADOS DO SALÃO (CORES, NOME, ETC) ---
+  // --- ATUALIZAR DADOS DO SALÃO (AGORA COM TRIAL E PLANO) ---
   async update(id: string, data: any) {
     // Se tentar mudar o slug, verifica se já existe
     if (data.slug) {
@@ -41,16 +41,30 @@ export class TenantsService {
         }
     }
 
-    return await prisma.tenant.update({
-      where: { id },
-      data: {
+    const dadosAtualizar: any = {
         nome: data.nome,
         slug: data.slug,
         telefone: data.telefone,
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
-        whatsappInstance: data.whatsappInstance
-      }
+        whatsappInstance: data.whatsappInstance,
+        
+        // --- CORREÇÃO: CAMPOS QUE FALTAVAM ---
+        plano: data.plano,
+        statusAssinatura: data.statusAssinatura,
+        trialFim: data.trialFim,
+        asaasCustomerId: data.asaasCustomerId
+        // -------------------------------------
+    };
+
+    // Remove chaves undefined para não apagar dados sem querer
+    Object.keys(dadosAtualizar).forEach(key => 
+        dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
+    );
+
+    return await prisma.tenant.update({
+      where: { id },
+      data: dadosAtualizar
     });
   }
   // --------------------------------------------------
