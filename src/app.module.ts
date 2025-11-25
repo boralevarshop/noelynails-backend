@@ -10,6 +10,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { BlocksModule } from './modules/blocks/blocks.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { BlocksModule } from './modules/blocks/blocks.module';
     ClientsModule,
     UsersModule,
     TenantsModule,
-    BlocksModule
+    BlocksModule,
+    BillingModule
   ],
   controllers: [],
   providers: [],
