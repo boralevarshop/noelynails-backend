@@ -9,7 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// TIPOS DE USUÁRIO
 enum Role {
   ADMIN_GLOBAL
   DONO_SALAO
@@ -17,17 +16,12 @@ enum Role {
   CLIENTE
 }
 
-// STATUS DO AGENDAMENTO
 enum StatusAgendamento {
   PENDENTE
   CONFIRMADO
   CANCELADO
   CONCLUIDO
 }
-
-// --------------------------------------
-// TABELAS
-// --------------------------------------
 
 // SALÕES (TENANTS)
 model Tenant {
@@ -38,16 +32,14 @@ model Tenant {
   logoUrl          String?
   corPrimaria      String    @default("#000000")
   
-  // --- CAMPOS DE PLANOS E PAGAMENTO (FASE 8) ---
-  plano            String    @default("FREE")     // FREE, PRIME, SUPREME
-  asaasCustomerId  String?   // ID do cliente lá no Asaas
+  // --- PLANOS E PAGAMENTO ---
+  plano            String    @default("FREE")     // FREE, INDIVIDUAL, PRIME, SUPREME
+  asaasCustomerId  String?   
   statusAssinatura String    @default("ACTIVE")   // TRIAL, ACTIVE, OVERDUE, CANCELED
-  trialFim         DateTime? // Data que acaba o teste grátis
-  // ---------------------------------------------
+  trialFim         DateTime? 
+  // --------------------------
 
-  // --- CAMPO DE WHATSAPP (INTEGRAÇÃO DINÂMICA) ---
-  whatsappInstance String?   // Nome da instância na Evolution API
-  // -----------------------------------------------
+  whatsappInstance String?   
 
   ativo            Boolean   @default(true)
   createdAt        DateTime  @default(now())
@@ -151,7 +143,7 @@ model Agendamento {
   @@map("agendamentos")
 }
 
-// BLOQUEIOS DE AGENDA
+// BLOQUEIOS
 model Bloqueio {
   id             String   @id @default(uuid())
   tenantId       String

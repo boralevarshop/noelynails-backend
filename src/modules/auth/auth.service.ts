@@ -6,30 +6,26 @@ const prisma = new PrismaClient();
 @Injectable()
 export class AuthService {
   
-  // --- CADASTRO COM DEGUSTAÇÃO PREMIUM (7 DIAS) ---
   async register(dados: any) {
     const { nomeSalao, slug, nomeSeu, email, telefone, senha } = dados;
 
-    // Validações de unicidade
     const slugExiste = await prisma.tenant.findUnique({ where: { slug } });
     if (slugExiste) throw new BadRequestException('Este link de salão já está em uso.');
 
     const emailExiste = await prisma.usuario.findUnique({ where: { email } });
     if (emailExiste) throw new BadRequestException('Este email já está cadastrado.');
 
-    // Calcula data de fim do trial (Hoje + 7 dias)
+    // Trial de 7 dias
     const hoje = new Date();
     const dataFimTrial = new Date();
     dataFimTrial.setDate(hoje.getDate() + 7);
 
-    // Cria o Tenant já como SUPREME (Degustação)
     const novoTenant = await prisma.tenant.create({
       data: {
         nome: nomeSalao,
         slug: slug,
         telefone: telefone,
         
-        // Configuração do Trial
         plano: 'SUPREME', 
         statusAssinatura: 'TRIAL',
         trialFim: dataFimTrial,
@@ -38,7 +34,7 @@ export class AuthService {
           create: {
             nome: nomeSeu,
             email: email,
-            senha: senha, // TODO: Hash no futuro
+            senha: senha,
             role: 'DONO_SALAO',
             telefone: telefone
           }
@@ -54,7 +50,6 @@ export class AuthService {
     };
   }
 
-  // --- LOGIN ---
   async login(dados: any) {
     const { email, senha } = dados;
 
