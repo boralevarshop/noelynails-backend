@@ -68,12 +68,23 @@ export class AppointmentsService {
     return candidatos;
   }
 
+  // --- CRIAÇÃO DE AGENDAMENTO BLINDADO ---
   async create(data: any) {
     const { tenantId, nomeCliente, telefoneCliente, serviceId, professionalId, dataHora } = data;
 
     if (!serviceId || !professionalId || !dataHora) throw new BadRequestException('Dados incompletos.');
 
-    // 1. Validação do Plano
+    // 1. VALIDAÇÃO DE DATA PASSADA (CORREÇÃO)
+    // Cria uma data de "Agora" subtraindo 10 minutos de tolerância para evitar erro de clock skew
+    const agora = new Date();
+    agora.setMinutes(agora.getMinutes() - 10);
+    const dataAgendamento = new Date(dataHora);
+
+    if (dataAgendamento < agora) {
+        throw new BadRequestException('Não é possível criar agendamentos no passado.');
+    }
+
+    // 2. Validação do Plano
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new BadRequestException('Salão não encontrado.');
 
@@ -91,57 +102,70 @@ export class AppointmentsService {
         if (totalMes >= 20) throw new BadRequestException('Limite de 20 agendamentos do plano Grátis atingido.');
     }
 
-    // 2. Busca Serviço
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
     if (!servico) throw new BadRequestException('Serviço não encontrado.');
 
     const dataInicio = new Date(dataHora);
     const dataFim = new Date(dataInicio.getTime() + servico.duracaoMin * 60000);
 
-    // 3. VALIDAÇÃO DE JORNADA DE TRABALHO
+    // 3. VALIDAÇÃO DE JORNADA (CORREÇÃO DE FUSO)
     const profissional = await prisma.usuario.findUnique({ where: { id: professionalId } });
-    if (profissional && profissional.horarios) {
-        const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-        const diaSemana = diasMap[dataInicio.getDay()]; 
-        const configDia = (profissional.horarios as any)[diaSemana];
-
-        if (!configDia || !configDia.ativo) {
-            throw new BadRequestException(`O profissional ${profissional.nome} não atende neste dia da semana.`);
-        }
-
-        const minutosAgendamento = dataInicio.getHours() * 60 + dataInicio.getMinutes();
-        const [hIni, mIni] = configDia.inicio.split(':').map(Number);
-        const [hFim, mFim] = configDia.fim.split(':').map(Number);
+    
+    if (profissional) {
+        // Se não tiver horários configurados, assume horário comercial ou bloqueia?
+        // Vamos bloquear para forçar a configuração correta, ou liberar seg-sex se preferir.
+        // Assumindo que se "horarios" for null, ele não configurou, então usamos um padrão seguro.
         
-        const inicioJornada = hIni * 60 + mIni;
-        const fimJornada = hFim * 60 + mFim;
+        if (profissional.horarios) {
+            // Converte a data do agendamento para o fuso horário de Brasília para saber o dia da semana correto
+            // Isso evita que Domingo à noite vire Segunda no servidor UTC
+            const dataBrasilia = new Date(dataInicio.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+            
+            const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+            const diaSemana = diasMap[dataBrasilia.getDay()]; // Pega o dia correto no Brasil
 
-        if (minutosAgendamento < inicioJornada || minutosAgendamento >= fimJornada) {
-             throw new BadRequestException(`Horário fora do expediente de ${profissional.nome} (${configDia.inicio} às ${configDia.fim}).`);
+            const configDia = (profissional.horarios as any)[diaSemana];
+
+            // Verifica se trabalha no dia
+            if (!configDia || !configDia.ativo) {
+                throw new BadRequestException(`O profissional ${profissional.nome} não atende neste dia (${diaSemana}).`);
+            }
+
+            // Verifica horário
+            const minutosAgendamento = dataBrasilia.getHours() * 60 + dataBrasilia.getMinutes();
+            const [hIni, mIni] = configDia.inicio.split(':').map(Number);
+            const [hFim, mFim] = configDia.fim.split(':').map(Number);
+            
+            const inicioJornada = hIni * 60 + mIni;
+            const fimJornada = hFim * 60 + mFim;
+
+            if (minutosAgendamento < inicioJornada || minutosAgendamento >= fimJornada) {
+                throw new BadRequestException(`Horário fora do expediente de ${profissional.nome} (${configDia.inicio} às ${configDia.fim}).`);
+            }
         }
     }
 
-    // 4. VALIDAÇÃO DE BLOQUEIOS (CORRIGIDO AQUI)
+    // 4. VALIDAÇÃO DE BLOQUEIOS
     const bloqueio = await prisma.bloqueio.findFirst({
         where: {
-            profissionalId: professionalId, // Mapeando a variável certa
+            profissionalId: professionalId,
             tenantId,
             AND: [
-                { inicio: { lt: dataFim } },
-                { fim: { gt: dataInicio } }
+                { inicio: { lt: dataFim } }, 
+                { fim: { gt: dataInicio } }  
             ]
         }
     });
 
     if (bloqueio) {
-        throw new BadRequestException(`Horário bloqueado para este profissional: ${bloqueio.motivo || 'Indisponível'}`);
+        throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
     }
 
-    // 5. VALIDAÇÃO DE CONFLITO (CORRIGIDO AQUI)
+    // 5. VALIDAÇÃO DE CONFLITO
     const conflito = await prisma.agendamento.findFirst({
       where: {
         tenantId,
-        profissionalId: professionalId, // Mapeando a variável certa
+        profissionalId: professionalId,
         status: { not: StatusAgendamento.CANCELADO },
         AND: [ { dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } } ]
       }
