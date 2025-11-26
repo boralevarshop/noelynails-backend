@@ -27,44 +27,41 @@ export class AppointmentsService {
     });
   }
 
-  // --- CALCULADORA DE DISPONIBILIDADE (LÓGICA REFEITA) ---
+  // --- CALCULADORA DE DISPONIBILIDADE ---
   async getAvailableSlots(tenantId: string, professionalId: string, date: string, serviceId: string) {
-    // 1. Validações Iniciais
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
     const profissional = await prisma.usuario.findUnique({ where: { id: professionalId } });
     
-    if (!servico || !profissional) return []; // Se dados inválidos, retorna vazio
+    if (!servico || !profissional) throw new BadRequestException('Dados inválidos');
 
-    const duracaoSlots = 30; // Intervalo padrão de 30 min
+    const duracaoSlots = 30; 
     const duracaoServico = servico.duracaoMin;
     
-    // 2. Identifica o Dia da Semana
-    // Força a data para o fuso brasileiro para pegar o dia correto (evita bug do domingo virar segunda)
-    const dataBaseBR = new Date(`${date}T12:00:00-03:00`); 
+    // Data Alvo (Fuso Brasil)
+    const diaAlvo = new Date(`${date}T00:00:00-03:00`);
     const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-    const diaSemana = diasMap[dataBaseBR.getDay()];
+    const diaSemana = diasMap[diaAlvo.getDay()];
 
-    // 3. Verifica se trabalha nesse dia
+    // Checa Jornada
     if (!profissional.horarios || !(profissional.horarios as any)[diaSemana]?.ativo) {
-        return []; // Folga
+        return []; 
     }
 
-    // 4. Pega horário de entrada e saída
-    const jornada = (profissional.horarios as any)[diaSemana]; // ex: { inicio: "09:00", fim: "18:00" }
+    const jornada = (profissional.horarios as any)[diaSemana];
     const [iniH, iniM] = jornada.inicio.split(':').map(Number);
     const [fimH, fimM] = jornada.fim.split(':').map(Number);
     
-    const inicioMinutosDoDia = iniH * 60 + iniM;
-    const fimMinutosDoDia = fimH * 60 + fimM;
+    const inicioMinutos = iniH * 60 + iniM;
+    const fimMinutos = fimH * 60 + fimM;
 
-    // 5. Busca Ocupações (Agendamentos e Bloqueios) do dia
+    // Busca ocupações
     const inicioDoDiaISO = new Date(`${date}T00:00:00-03:00`).toISOString();
     const fimDoDiaISO = new Date(`${date}T23:59:59-03:00`).toISOString();
 
     const agendamentos = await prisma.agendamento.findMany({
         where: {
             profissionalId: professionalId,
-            status: { not: 'CANCELADO' }, // Pega Confirmado e Concluído (ocupam espaço)
+            status: { not: 'CANCELADO' },
             dataHora: { gte: inicioDoDiaISO, lte: fimDoDiaISO }
         }
     });
@@ -78,43 +75,40 @@ export class AppointmentsService {
     });
 
     const slotsDisponiveis: string[] = [];
-    const agora = new Date(); // Hora atual do servidor
+    
+    // --- REGRA DE ANTECEDÊNCIA (4 HORAS) ---
+    const agora = new Date();
+    agora.setHours(agora.getHours() - 3); // Ajuste fuso Brasil
+    
+    // Define o tempo mínimo: Agora + 4 horas
+    const tempoMinimo = new Date(agora.getTime() + 4 * 60 * 60 * 1000);
+    // ---------------------------------------
 
-    // 6. Loop para montar a agenda
-    // Começa na hora que abre, vai de 30 em 30 min, até (hora que fecha - duração do serviço)
-    for (let time = inicioMinutosDoDia; time <= fimMinutosDoDia - duracaoServico; time += duracaoSlots) {
-        
+    for (let time = inicioMinutos; time <= fimMinutos - duracaoServico; time += duracaoSlots) {
         const slotHora = Math.floor(time / 60);
         const slotMin = time % 60;
         
-        // Cria objetos de Data para comparação precisa
-        // Monta a data usando string ISO para garantir fuso -03:00
-        const slotInicioStr = `${date}T${slotHora.toString().padStart(2,'0')}:${slotMin.toString().padStart(2,'0')}:00-03:00`;
-        const slotInicio = new Date(slotInicioStr);
+        const slotInicio = new Date(diaAlvo);
+        slotInicio.setHours(slotHora, slotMin, 0, 0);
         
         const slotFim = new Date(slotInicio);
         slotFim.setMinutes(slotFim.getMinutes() + duracaoServico);
 
-        // REGRA A: Não pode ser no passado
-        // (Adicionamos 3h de folga caso o servidor esteja em UTC puro sem ajuste)
-        if (slotInicio < agora) continue; 
+        // Se o slot for antes do tempo mínimo (4h a partir de agora), ignora
+        if (slotInicio < tempoMinimo) continue;
 
-        // REGRA B: Colisão com Agendamentos
         const temConflitoAgenda = agendamentos.some(ag => {
             const agIni = new Date(ag.dataHora);
             const agFim = new Date(ag.dataFim);
-            // Lógica de colisão: (SlotInicio < AgFim) E (SlotFim > AgIni)
             return (slotInicio < agFim && slotFim > agIni);
         });
 
-        // REGRA C: Colisão com Bloqueios
         const temConflitoBloqueio = bloqueios.some(bl => {
             const blIni = new Date(bl.inicio);
             const blFim = new Date(bl.fim);
             return (slotInicio < blFim && slotFim > blIni);
         });
 
-        // Se passou em tudo, adiciona na lista
         if (!temConflitoAgenda && !temConflitoBloqueio) {
             const label = `${slotHora.toString().padStart(2, '0')}:${slotMin.toString().padStart(2, '0')}`;
             slotsDisponiveis.push(label);
@@ -124,28 +118,59 @@ export class AppointmentsService {
     return slotsDisponiveis;
   }
 
-  // ... (Resto das funções findRetentionCandidates, create, findAllByTenant, cancel, dispararWebhook IGUAIS) ...
-  
   async findRetentionCandidates(tenantId: string) {
-    // ... (Manter código anterior) ...
-    return [];
+    const candidatos: any[] = [];
+    const servicos = await prisma.servico.findMany({ where: { tenantId, ativo: true } });
+
+    for (const servico of servicos) {
+      const diasParaVoltar = servico.diasRetorno || 30;
+      const dataAlvo = new Date();
+      dataAlvo.setDate(dataAlvo.getDate() - diasParaVoltar);
+      const inicioDia = new Date(dataAlvo.setHours(0, 0, 0, 0));
+      const fimDia = new Date(dataAlvo.setHours(23, 59, 59, 999));
+
+      const atendimentos = await prisma.agendamento.findMany({
+        where: {
+          tenantId,
+          servicoId: servico.id,
+          status: { in: [StatusAgendamento.CONCLUIDO, StatusAgendamento.CONFIRMADO] },
+          dataHora: { gte: inicioDia, lte: fimDia },
+          lembreteEnviado: false 
+        },
+        include: { cliente: true, servico: true, profissional: true }
+      });
+
+      for (const ag of atendimentos) {
+        const temFuturo = await prisma.agendamento.findFirst({
+          where: {
+            tenantId,
+            clienteId: ag.clienteId,
+            dataHora: { gt: new Date() }, 
+            status: { not: StatusAgendamento.CANCELADO }
+          }
+        });
+
+        if (!temFuturo) {
+          candidatos.push(ag);
+          await prisma.agendamento.update({ where: { id: ag.id }, data: { lembreteEnviado: true } });
+        }
+      }
+    }
+    return candidatos;
   }
-  
-  // MANTENHA O RESTO DAS FUNÇÕES QUE JÁ ESTAVAM AQUI (Create, FindAll, Cancel, Webhook)
-  // Para não ficar gigante a resposta, estou focando na correção do getAvailableSlots acima.
-  // Se precisar do arquivo 100% completo com todas as funções repetidas, me avise.
-  // Mas o ideal é substituir apenas o método getAvailableSlots ou garantir que as outras funções estejam lá.
-  
-  // Vou enviar o arquivo COMPLETO abaixo para evitar erros de copy-paste.
-  
+
   async create(data: any) {
     const { tenantId, nomeCliente, telefoneCliente, serviceId, professionalId, dataHora } = data;
+
     if (!serviceId || !professionalId || !dataHora) throw new BadRequestException('Dados incompletos.');
 
     const agora = new Date();
     agora.setMinutes(agora.getMinutes() - 10);
     const dataAgendamento = new Date(dataHora);
-    if (dataAgendamento < agora) throw new BadRequestException('Não é possível criar agendamentos no passado.');
+
+    if (dataAgendamento < agora) {
+        throw new BadRequestException('Não é possível criar agendamentos no passado.');
+    }
 
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new BadRequestException('Salão não encontrado.');
@@ -154,8 +179,12 @@ export class AppointmentsService {
         const hoje = new Date();
         const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
         const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+        
         const totalMes = await prisma.agendamento.count({
-            where: { tenantId, createdAt: { gte: inicioMes, lte: fimMes } }
+            where: {
+                tenantId,
+                createdAt: { gte: inicioMes, lte: fimMes }
+            }
         });
         if (totalMes >= 20) throw new BadRequestException('Limite de 20 agendamentos do plano Grátis atingido.');
     }
@@ -172,9 +201,12 @@ export class AppointmentsService {
         const dataBrasilia = new Date(dataInicio.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
         const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
         const diaSemana = diasMap[dataBrasilia.getDay()]; 
+
         const configDia = (profissional.horarios as any)[diaSemana];
 
-        if (!configDia || !configDia.ativo) throw new BadRequestException(`O profissional ${profissional.nome} não atende neste dia.`);
+        if (!configDia || !configDia.ativo) {
+            throw new BadRequestException(`O profissional ${profissional.nome} não atende neste dia (${diaSemana}).`);
+        }
 
         const minutosAgendamento = dataBrasilia.getHours() * 60 + dataBrasilia.getMinutes();
         const [hIni, mIni] = configDia.inicio.split(':').map(Number);
@@ -184,7 +216,7 @@ export class AppointmentsService {
         const fimJornada = hFim * 60 + mFim;
 
         if (minutosAgendamento < inicioJornada || minutosAgendamento >= fimJornada) {
-             throw new BadRequestException(`Horário fora do expediente.`);
+             throw new BadRequestException(`Horário fora do expediente (${configDia.inicio} às ${configDia.fim}).`);
         }
     }
 
@@ -192,10 +224,16 @@ export class AppointmentsService {
         where: {
             profissionalId: professionalId,
             tenantId,
-            AND: [ { inicio: { lt: dataFim } }, { fim: { gt: dataInicio } } ]
+            AND: [
+                { inicio: { lt: dataFim } }, 
+                { fim: { gt: dataInicio } }  
+            ]
         }
     });
-    if (bloqueio) throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
+
+    if (bloqueio) {
+        throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
+    }
 
     const conflito = await prisma.agendamento.findFirst({
       where: {
@@ -205,6 +243,7 @@ export class AppointmentsService {
         AND: [ { dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } } ]
       }
     });
+
     if (conflito) throw new BadRequestException('Este profissional já possui um cliente agendado neste horário!');
 
     let cliente = await prisma.cliente.findFirst({ where: { tenantId, telefone: telefoneCliente } });
@@ -255,10 +294,16 @@ export class AppointmentsService {
   private async dispararWebhook(dados: any, tipo: string) {
     try {
         const tenant = await prisma.tenant.findUnique({ where: { id: dados.tenantId } });
-        if (!tenant || !tenant.whatsappInstance || tenant.plano === 'FREE') return; 
+        
+        if (!tenant) return; 
+        if (tenant.plano === 'FREE') return; 
+        if (!tenant.whatsappInstance) return; 
+
         const payload = { ...dados, whatsappInstance: tenant.whatsappInstance };
         const n8nUrl = `https://n8n.devhenri.shop/webhook/${tipo}`; 
         await lastValueFrom(this.httpService.post(n8nUrl, payload));
-    } catch (error) { console.error('Erro ao chamar n8n:', error); }
+    } catch (error) {
+        console.error('Erro ao chamar n8n:', error);
+    }
   }
 }
