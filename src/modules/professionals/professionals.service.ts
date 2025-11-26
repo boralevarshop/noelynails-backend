@@ -54,15 +54,30 @@ export class ProfessionalsService {
     });
   }
 
-  async findAllByTenant(tenantId: string) {
+  // --- ATUALIZADO: BUSCA INTELIGENTE ---
+  async findAllByTenant(tenantId: string, serviceId?: string) {
+    const whereClause: any = {
+      tenantId: tenantId,
+      role: { in: [Role.PROFISSIONAL, Role.DONO_SALAO] } 
+    };
+
+    // Se um serviço foi especificado (Fluxo de Agendamento Público)
+    if (serviceId) {
+        // 1. Filtra apenas quem realiza este serviço
+        whereClause.servicosQueAtende = {
+            some: { id: serviceId }
+        };
+        
+        // 2. Filtra apenas quem permitiu aparecer no site
+        whereClause.aparecerNoSite = true;
+    }
+
     return await prisma.usuario.findMany({
-      where: {
-        tenantId: tenantId,
-        role: { in: [Role.PROFISSIONAL, Role.DONO_SALAO] } 
-      },
+      where: whereClause,
       orderBy: { nome: 'asc' } 
     });
   }
+  // -------------------------------------
 
   async remove(id: string) {
     // Limpa agendamentos e bloqueios antes de apagar o profissional
