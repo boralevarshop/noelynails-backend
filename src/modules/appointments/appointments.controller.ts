@@ -10,7 +10,7 @@ export class AppointmentsController {
     return this.appointmentsService.create(data);
   }
 
-  // --- NOVO: ROTA PARA CALCULAR HORÁRIOS LIVRES (Página Pública) ---
+  // --- ROTA DE DISPONIBILIDADE (CRUCIAL PARA A AGENDA PÚBLICA) ---
   @Get('availability')
   getAvailability(
     @Query('tenantId') tenantId: string,
@@ -18,17 +18,16 @@ export class AppointmentsController {
     @Query('date') date: string,
     @Query('serviceId') serviceId: string
   ) {
+    // Chama a calculadora no Service
     return this.appointmentsService.getAvailableSlots(tenantId, professionalId, date, serviceId);
   }
   // -----------------------------------------------------------------
 
-  // Rota de busca diária (Resumo) e geral
   @Get('tenant/:tenantId')
   findAll(@Param('tenantId') tenantId: string, @Query('date') date?: string) {
     return this.appointmentsService.findAllByTenant(tenantId, date);
   }
 
-  // Rota de Retenção (Win-Back)
   @Get('retention/:tenantId')
   findRetention(@Param('tenantId') tenantId: string) {
     return this.appointmentsService.findRetentionCandidates(tenantId);
