@@ -9,6 +9,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// TIPOS DE USUÁRIO
 enum Role {
   ADMIN_GLOBAL
   DONO_SALAO
@@ -16,12 +17,17 @@ enum Role {
   CLIENTE
 }
 
+// STATUS DO AGENDAMENTO
 enum StatusAgendamento {
   PENDENTE
   CONFIRMADO
   CANCELADO
   CONCLUIDO
 }
+
+// --------------------------------------
+// TABELAS
+// --------------------------------------
 
 // SALÕES (TENANTS)
 model Tenant {
@@ -32,11 +38,14 @@ model Tenant {
   logoUrl          String?
   
   // --- PERSONALIZAÇÃO ---
-  corPrimaria      String    @default("#4F46E5") // Roxo padrão
-  corSecundaria    String    @default("#F3F4F6") // Cinza claro padrão
-  // ---------------------
+  corPrimaria      String    @default("#4F46E5")
+  corSecundaria    String    @default("#F3F4F6")
+  
+  // --- CONTROLES DE AGENDAMENTO (NOVO) ---
+  agendamentoOnline Boolean  @default(true) // Botão para ativar/desativar o site público
+  // ---------------------------------------
 
-  plano            String    @default("FREE")    
+  plano            String    @default("FREE")     
   asaasCustomerId  String?   
   statusAssinatura String    @default("ACTIVE")
   trialFim         DateTime? 
@@ -70,6 +79,10 @@ model Usuario {
   bio         String?
   instagram   String?
   avatarUrl   String?
+
+  // --- CONTROLE PROFISSIONAL (NOVO) ---
+  aparecerNoSite Boolean @default(true) // Botão para a profissional aparecer ou não no agendamento
+  // ------------------------------------
   
   horarios    Json?    
   
@@ -107,12 +120,16 @@ model Cliente {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
   nome        String
   telefone    String   
   email       String?
+  
   agendamentos Agendamento[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
   @@unique([tenantId, telefone])
   @@map("clientes")
 }
@@ -122,15 +139,19 @@ model Agendamento {
   id             String            @id @default(uuid())
   tenantId       String
   tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  
   clienteId      String
   cliente        Cliente           @relation(fields: [clienteId], references: [id])
+  
   profissionalId String
   profissional   Usuario           @relation(fields: [profissionalId], references: [id])
+  
   servicoId      String
   servico        Servico           @relation(fields: [servicoId], references: [id])
   
   dataHora       DateTime 
   dataFim        DateTime 
+  
   status         StatusAgendamento @default(PENDENTE)
   observacoes    String?
   canceladoPor   String?
@@ -148,11 +169,14 @@ model Bloqueio {
   id             String   @id @default(uuid())
   tenantId       String
   tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  
   profissionalId String
   profissional   Usuario  @relation(fields: [profissionalId], references: [id])
+  
   inicio         DateTime
   fim            DateTime
   motivo         String? 
+
   createdAt      DateTime @default(now())
 
   @@map("bloqueios")

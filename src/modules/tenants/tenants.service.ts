@@ -31,11 +31,10 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
-  // --- NOVO: BUSCAR POR SLUG (PÚBLICO) ---
+  // Buscar por Slug (Público)
   async findBySlug(slug: string) {
     const tenant = await prisma.tenant.findUnique({
         where: { slug },
-        // Retorna apenas dados públicos (segurança)
         select: {
             id: true,
             nome: true,
@@ -44,7 +43,8 @@ export class TenantsService {
             corPrimaria: true,
             corSecundaria: true,
             logoUrl: true,
-            ativo: true
+            ativo: true,
+            agendamentoOnline: true // Retorna se está aberto para agendamento
         }
     });
 
@@ -53,8 +53,8 @@ export class TenantsService {
 
     return tenant;
   }
-  // ---------------------------------------
 
+  // Atualizar dados do salão
   async update(id: string, data: any) {
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
@@ -70,12 +70,19 @@ export class TenantsService {
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
         whatsappInstance: data.whatsappInstance,
+        
+        // Campos Financeiros
         plano: data.plano,
         statusAssinatura: data.statusAssinatura,
         trialFim: data.trialFim,
-        asaasCustomerId: data.asaasCustomerId
+        asaasCustomerId: data.asaasCustomerId,
+
+        // --- CAMPO NOVO ADICIONADO ---
+        agendamentoOnline: data.agendamentoOnline 
+        // -----------------------------
     };
 
+    // Limpa campos undefined
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );
