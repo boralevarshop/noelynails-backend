@@ -1,29 +1,31 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ScheduleModule } from '@nestjs/schedule'; // <--- Importe
-import { AuthModule } from './modules/auth/auth.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
-import { AppointmentsModule } from './modules/appointments/appointments.module';
+
+// Imports dos Módulos
+import { AuthModule } from './modules/auth/auth.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
+import { UsersModule } from './modules/users/users.module';
 import { ServicesModule } from './modules/services/services.module';
 import { ProfessionalsModule } from './modules/professionals/professionals.module';
 import { ClientsModule } from './modules/clients/clients.module';
-import { UsersModule } from './modules/users/users.module';
-import { TenantsModule } from './modules/tenants/tenants.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { BlocksModule } from './modules/blocks/blocks.module';
 import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ScheduleModule.forRoot(), // <--- Ativa o Cron
-    HttpModule, 
+    ScheduleModule.forRoot(),
+    HttpModule,
     AuthModule,
-    AppointmentsModule,
+    TenantsModule,
+    UsersModule,
     ServicesModule,
     ProfessionalsModule,
     ClientsModule,
-    UsersModule,
-    TenantsModule,
+    AppointmentsModule,
     BlocksModule,
     BillingModule
   ],

@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// TIPOS DE USUÁRIO
 enum Role {
   ADMIN_GLOBAL
   DONO_SALAO
@@ -17,7 +14,6 @@ enum Role {
   CLIENTE
 }
 
-// STATUS DO AGENDAMENTO
 enum StatusAgendamento {
   PENDENTE
   CONFIRMADO
@@ -25,11 +21,16 @@ enum StatusAgendamento {
   CONCLUIDO
 }
 
-// --------------------------------------
-// TABELAS
-// --------------------------------------
+enum Segmento {
+  SALAO_BELEZA
+  BARBEARIA
+  CLINICA
+  ESTETICA
+  PETSHOP
+  ESTUDIO_TATTOO
+  SERVICOS_GERAIS
+}
 
-// SALÕES (TENANTS)
 model Tenant {
   id               String    @id @default(uuid())
   nome             String
@@ -37,17 +38,14 @@ model Tenant {
   telefone         String?
   logoUrl          String?
   
-  // --- PERSONALIZAÇÃO ---
   corPrimaria      String    @default("#4F46E5")
   corSecundaria    String    @default("#F3F4F6")
-  
-  // --- CONTROLES DE AGENDAMENTO (NOVO) ---
-  agendamentoOnline Boolean  @default(true) // Botão para ativar/desativar o site público
-  // ---------------------------------------
+  segmento         Segmento  @default(SALAO_BELEZA) 
+  agendamentoOnline Boolean  @default(true) 
 
   plano            String    @default("FREE")     
   asaasCustomerId  String?   
-  statusAssinatura String    @default("ACTIVE")
+  statusAssinatura String    @default("ACTIVE")   
   trialFim         DateTime? 
   whatsappInstance String?   
   ativo            Boolean   @default(true)
@@ -64,7 +62,6 @@ model Tenant {
   @@map("tenants")
 }
 
-// USUÁRIOS
 model Usuario {
   id          String   @id @default(uuid())
   tenantId    String
@@ -79,10 +76,7 @@ model Usuario {
   bio         String?
   instagram   String?
   avatarUrl   String?
-
-  // --- CONTROLE PROFISSIONAL (NOVO) ---
-  aparecerNoSite Boolean @default(true) // Botão para a profissional aparecer ou não no agendamento
-  // ------------------------------------
+  aparecerNoSite Boolean @default(true) 
   
   horarios    Json?    
   
@@ -96,18 +90,15 @@ model Usuario {
   @@map("usuarios")
 }
 
-// SERVIÇOS
 model Servico {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
   nome        String
   descricao   String?
   preco       Decimal  @db.Decimal(10, 2)
   duracaoMin  Int
   diasRetorno Int      @default(30) 
-
   ativo       Boolean  @default(true)
   agendamentos Agendamento[]
   profissionais Usuario[] 
@@ -115,43 +106,33 @@ model Servico {
   @@map("servicos")
 }
 
-// CLIENTES
 model Cliente {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
   nome        String
   telefone    String   
   email       String?
-  
   agendamentos Agendamento[]
-
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   @@unique([tenantId, telefone])
   @@map("clientes")
 }
 
-// AGENDAMENTOS
 model Agendamento {
   id             String            @id @default(uuid())
   tenantId       String
   tenant         Tenant            @relation(fields: [tenantId], references: [id])
-  
   clienteId      String
   cliente        Cliente           @relation(fields: [clienteId], references: [id])
-  
   profissionalId String
   profissional   Usuario           @relation(fields: [profissionalId], references: [id])
-  
   servicoId      String
   servico        Servico           @relation(fields: [servicoId], references: [id])
   
   dataHora       DateTime 
   dataFim        DateTime 
-  
   status         StatusAgendamento @default(PENDENTE)
   observacoes    String?
   canceladoPor   String?
@@ -164,20 +145,15 @@ model Agendamento {
   @@map("agendamentos")
 }
 
-// BLOQUEIOS
 model Bloqueio {
   id             String   @id @default(uuid())
   tenantId       String
   tenant         Tenant   @relation(fields: [tenantId], references: [id])
-  
   profissionalId String
   profissional   Usuario  @relation(fields: [profissionalId], references: [id])
-  
   inicio         DateTime
   fim            DateTime
   motivo         String? 
-
   createdAt      DateTime @default(now())
-
   @@map("bloqueios")
 }
