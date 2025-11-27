@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'; // Adicionei NotFoundException
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -19,7 +19,7 @@ export class TenantsService {
 
   async toggleStatus(id: string) {
     const tenant = await prisma.tenant.findUnique({ where: { id } });
-    if (!tenant) throw new BadRequestException('Salão não encontrado.');
+    if (!tenant) throw new NotFoundException('Salão não encontrado.');
     
     return await prisma.tenant.update({
       where: { id },
@@ -31,7 +31,7 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
-  // Buscar por Slug (Público)
+  // --- BUSCAR POR SLUG (PÚBLICO) ---
   async findBySlug(slug: string) {
     const tenant = await prisma.tenant.findUnique({
         where: { slug },
@@ -44,17 +44,19 @@ export class TenantsService {
             corSecundaria: true,
             logoUrl: true,
             ativo: true,
-            agendamentoOnline: true // Retorna se está aberto para agendamento
+            agendamentoOnline: true
         }
     });
 
-    if (!tenant) throw new BadRequestException('Salão não encontrado.');
+    // MUDANÇA AQUI: De BadRequest (400) para NotFound (404)
+    if (!tenant) throw new NotFoundException('Salão não encontrado.');
+    
     if (!tenant.ativo) throw new BadRequestException('Este salão está temporariamente indisponível.');
 
     return tenant;
   }
+  // ---------------------------------------
 
-  // Atualizar dados do salão
   async update(id: string, data: any) {
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
@@ -70,19 +72,13 @@ export class TenantsService {
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
         whatsappInstance: data.whatsappInstance,
-        
-        // Campos Financeiros
         plano: data.plano,
         statusAssinatura: data.statusAssinatura,
         trialFim: data.trialFim,
         asaasCustomerId: data.asaasCustomerId,
-
-        // --- CAMPO NOVO ADICIONADO ---
         agendamentoOnline: data.agendamentoOnline 
-        // -----------------------------
     };
 
-    // Limpa campos undefined
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );
