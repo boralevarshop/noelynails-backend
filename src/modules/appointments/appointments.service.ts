@@ -235,7 +235,8 @@ export class AppointmentsService {
     }
     return await prisma.agendamento.findMany({
       where: whereClause,
-      include: { cliente: true, servico: true, profissional: true },
+      // ADICIONADO: tenant: true para o n8n saber o segmento (ícones)
+      include: { cliente: true, servico: true, profissional: true, tenant: true },
       orderBy: { dataHora: 'asc' }
     });
   }
