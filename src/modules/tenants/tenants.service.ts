@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'; // Adicionei NotFoundException
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -44,20 +44,20 @@ export class TenantsService {
             corSecundaria: true,
             logoUrl: true,
             ativo: true,
-            agendamentoOnline: true
+            agendamentoOnline: true,
+            segmento: true // <--- NOVO: Retorna o segmento para o frontend saber quais ícones usar
         }
     });
 
-    // MUDANÇA AQUI: De BadRequest (400) para NotFound (404)
     if (!tenant) throw new NotFoundException('Salão não encontrado.');
-    
     if (!tenant.ativo) throw new BadRequestException('Este salão está temporariamente indisponível.');
 
     return tenant;
   }
-  // ---------------------------------------
 
+  // --- ATUALIZAR DADOS DO SALÃO ---
   async update(id: string, data: any) {
+    // Validação de Slug único
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
         if (existe && existe.id !== id) {
@@ -69,16 +69,24 @@ export class TenantsService {
         nome: data.nome,
         slug: data.slug,
         telefone: data.telefone,
+        
+        // Personalização Visual e Nicho
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
+        segmento: data.segmento, // <--- NOVO: Salva se é Barbearia, Clínica, etc.
+        
+        // Integrações e Controles
         whatsappInstance: data.whatsappInstance,
+        agendamentoOnline: data.agendamentoOnline,
+
+        // Financeiro (Admin)
         plano: data.plano,
         statusAssinatura: data.statusAssinatura,
         trialFim: data.trialFim,
-        asaasCustomerId: data.asaasCustomerId,
-        agendamentoOnline: data.agendamentoOnline 
+        asaasCustomerId: data.asaasCustomerId
     };
 
+    // Limpa campos vazios para não apagar dados sem querer
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );
