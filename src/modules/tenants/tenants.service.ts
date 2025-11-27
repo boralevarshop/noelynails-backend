@@ -44,14 +44,13 @@ export class TenantsService {
             corSecundaria: true,
             logoUrl: true,
             ativo: true,
-            agendamentoOnline: true, // Campo de controle
-            segmento: true // <--- Retorna o nicho (Barbearia, etc)
+            agendamentoOnline: true, 
+            segmento: true // <--- Importante: Retorna o nicho para o site saber qual ícone usar
         }
     });
 
     if (!tenant) throw new NotFoundException('Salão não encontrado.');
     
-    // Verifica se o dono fechou a agenda
     if (!tenant.agendamentoOnline) {
         throw new BadRequestException('O agendamento online está desativado para este salão.');
     }
@@ -75,14 +74,14 @@ export class TenantsService {
         slug: data.slug,
         telefone: data.telefone,
         
-        // Visual e Segmento
+        // Visual e Nicho
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
-        segmento: data.segmento, // <--- Permite salvar o nicho
-
+        segmento: data.segmento, // <--- OBRIGATÓRIO: Salva se é Barbearia, Clínica, etc.
+        
         // Integrações e Controles
         whatsappInstance: data.whatsappInstance,
-        agendamentoOnline: data.agendamentoOnline, // <--- Permite ligar/desligar agenda
+        agendamentoOnline: data.agendamentoOnline,
 
         // Financeiro
         plano: data.plano,
@@ -91,7 +90,7 @@ export class TenantsService {
         asaasCustomerId: data.asaasCustomerId
     };
 
-    // Remove campos vazios para não apagar dados existentes
+    // Limpa campos vazios
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );

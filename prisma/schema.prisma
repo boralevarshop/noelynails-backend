@@ -9,8 +9,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- TIPOS DE DADOS ---
-
+// --- ENUMS EXISTENTES ---
 enum Role {
   ADMIN_GLOBAL
   DONO_SALAO
@@ -25,21 +24,17 @@ enum StatusAgendamento {
   CONCLUIDO
 }
 
-// --- NOVO: SEGMENTOS DO SISTEMA ---
+// --- NOVO: SEGMENTOS (Para definir os ícones) ---
 enum Segmento {
-  SALAO_BELEZA    // Padrão (Unhas, Cabelo Fem)
-  BARBEARIA       // (Barba, Cabelo Masc)
-  CLINICA         // (Saúde, Dentista, Nutri)
-  ESTETICA        // (Massagem, Botox, Laser)
-  PETSHOP         // (Banho, Tosa, Vet)
-  ESTUDIO_TATTOO  // (Tatuagem, Piercing)
-  SERVICOS_GERAIS // (Advogado, Contador, Consultoria)
+  SALAO_BELEZA    // Padrão
+  BARBEARIA       
+  CLINICA         
+  ESTETICA        
+  PETSHOP         
+  ESTUDIO_TATTOO  
+  SERVICOS_GERAIS 
 }
-// ----------------------------------
-
-// --------------------------------------
-// TABELAS
-// --------------------------------------
+// -----------------------------------------------
 
 // SALÕES (TENANTS)
 model Tenant {
@@ -49,18 +44,16 @@ model Tenant {
   telefone         String?
   logoUrl          String?
   
-  // --- PERSONALIZAÇÃO VISUAL ---
+  // Personalização Visual
   corPrimaria      String    @default("#4F46E5")
   corSecundaria    String    @default("#F3F4F6")
   
-  // --- NOVO: DEFINIÇÃO DO NICHO ---
+  // --- NOVO CAMPO: SEGMENTO ---
   segmento         Segmento  @default(SALAO_BELEZA) 
-  // -------------------------------
+  // ----------------------------
 
-  // --- CONTROLES DE AGENDAMENTO ---
-  agendamentoOnline Boolean  @default(true) 
+  agendamentoOnline Boolean  @default(true)
 
-  // --- FINANCEIRO ---
   plano            String    @default("FREE")     
   asaasCustomerId  String?   
   statusAssinatura String    @default("ACTIVE")   
@@ -96,7 +89,6 @@ model Usuario {
   instagram   String?
   avatarUrl   String?
 
-  // Controle Profissional
   aparecerNoSite Boolean @default(true) 
   
   horarios    Json?    
