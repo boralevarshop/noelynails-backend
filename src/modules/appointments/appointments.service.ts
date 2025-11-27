@@ -57,27 +57,31 @@ export class AppointmentsService {
     const inicioDoDiaISO = new Date(`${date}T00:00:00-03:00`).toISOString();
     const fimDoDiaISO = new Date(`${date}T23:59:59-03:00`).toISOString();
 
-    // Busca Agendamentos (Mapeando profissionalId corretamente)
+    // Busca Agendamentos
     const agendamentos = await prisma.agendamento.findMany({
         where: {
-            profissionalId: professionalId, // <--- CORREÇÃO AQUI
+            profissionalId: professionalId,
             status: { not: 'CANCELADO' },
             dataHora: { gte: inicioDoDiaISO, lte: fimDoDiaISO }
         }
     });
 
-    // Busca Bloqueios (Mapeando profissionalId corretamente)
+    // Busca Bloqueios
     const bloqueios = await prisma.bloqueio.findMany({
         where: {
-            profissionalId: professionalId, // <--- CORREÇÃO AQUI
+            profissionalId: professionalId,
             inicio: { lt: fimDoDiaISO },
             fim: { gt: inicioDoDiaISO }
         }
     });
 
     const slotsDisponiveis: string[] = [];
+    
+    // --- REGRA DE 4 HORAS DE ANTECEDÊNCIA ---
     const agora = new Date();
-    agora.setHours(agora.getHours() - 3);
+    agora.setHours(agora.getHours() - 3); // Ajuste para BRT
+    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); // Agora + 4 horas
+    // ----------------------------------------
 
     for (let time = inicioMinutos; time <= fimMinutos - duracaoServico; time += duracaoSlots) {
         const slotHora = Math.floor(time / 60);
@@ -89,7 +93,8 @@ export class AppointmentsService {
         const slotFim = new Date(slotInicio);
         slotFim.setMinutes(slotFim.getMinutes() + duracaoServico);
 
-        if (slotInicio < agora) continue;
+        // Valida antecedência mínima (4h)
+        if (slotInicio < tempoLimite) continue;
 
         const temConflitoAgenda = agendamentos.some(ag => {
             const agIni = new Date(ag.dataHora);
@@ -121,7 +126,6 @@ export class AppointmentsService {
       const diasParaVoltar = servico.diasRetorno || 30;
       
       // Calcula a Data Alvo (Hoje - Dias de Retorno)
-      // Ex: Se hoje é dia 30 e o retorno é 30 dias, buscamos quem veio dia 01.
       const dataAlvo = new Date();
       dataAlvo.setDate(dataAlvo.getDate() - diasParaVoltar);
       
@@ -135,13 +139,12 @@ export class AppointmentsService {
           servicoId: servico.id,
           status: { in: [StatusAgendamento.CONCLUIDO, StatusAgendamento.CONFIRMADO] },
           dataHora: { gte: inicioDia, lte: fimDia },
-          lembreteEnviado: false // Só quem ainda não recebeu aviso
+          lembreteEnviado: false 
         },
         include: { cliente: true, servico: true, profissional: true, tenant: true }
       });
 
       for (const ag of atendimentos) {
-        // Verifica se o cliente JÁ agendou algo para o futuro (se sim, não incomoda)
         const temFuturo = await prisma.agendamento.findFirst({
           where: {
             tenantId,
@@ -153,7 +156,6 @@ export class AppointmentsService {
 
         if (!temFuturo) {
           candidatos.push(ag);
-          // Marca que avisamos para não mandar de novo amanhã
           await prisma.agendamento.update({ where: { id: ag.id }, data: { lembreteEnviado: true } });
         }
       }
@@ -167,11 +169,17 @@ export class AppointmentsService {
 
     if (!serviceId || !professionalId || !dataHora) throw new BadRequestException('Dados incompletos.');
 
+    // --- VALIDAÇÃO DE ANTECEDÊNCIA (4 HORAS) ---
     const agora = new Date();
-    agora.setMinutes(agora.getMinutes() - 10);
+    agora.setHours(agora.getHours() - 3); // Ajuste para BRT
+    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); // Agora + 4h
+    
     const dataAgendamento = new Date(dataHora);
 
-    if (dataAgendamento < agora) throw new BadRequestException('Não é possível criar agendamentos no passado.');
+    if (dataAgendamento < tempoLimite) {
+        throw new BadRequestException('Agendamentos devem ser feitos com no mínimo 4 horas de antecedência.');
+    }
+    // --------------------------------------------
 
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new BadRequestException('Salão não encontrado.');
@@ -187,7 +195,7 @@ export class AppointmentsService {
                 createdAt: { gte: inicioMes, lte: fimMes }
             }
         });
-        if (totalMes >= 20) throw new BadRequestException('Limite do plano Free atingido.');
+        if (totalMes >= 20) throw new BadRequestException('Limite de 20 agendamentos do plano Grátis atingido.');
     }
 
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
@@ -219,10 +227,9 @@ export class AppointmentsService {
         }
     }
 
-    // CORREÇÃO AQUI: Mapeando professionalId -> profissionalId
     const bloqueio = await prisma.bloqueio.findFirst({
         where: {
-            profissionalId: professionalId, // <--- CORREÇÃO
+            profissionalId: professionalId,
             tenantId,
             AND: [
                 { inicio: { lt: dataFim } }, 
@@ -231,13 +238,14 @@ export class AppointmentsService {
         }
     });
 
-    if (bloqueio) throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
+    if (bloqueio) {
+        throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
+    }
 
-    // CORREÇÃO AQUI TAMBÉM
     const conflito = await prisma.agendamento.findFirst({
       where: {
         tenantId,
-        profissionalId: professionalId, // <--- CORREÇÃO
+        profissionalId: professionalId,
         status: { not: StatusAgendamento.CANCELADO },
         AND: [ { dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } } ]
       }
@@ -250,12 +258,11 @@ export class AppointmentsService {
       cliente = await prisma.cliente.create({ data: { tenantId, nome: nomeCliente, telefone: telefoneCliente } });
     }
 
-    // CORREÇÃO NA CRIAÇÃO
     const agendamento = await prisma.agendamento.create({
       data: {
         tenantId,
         clienteId: cliente.id,
-        profissionalId: professionalId, // <--- CORREÇÃO
+        profissionalId: professionalId, 
         servicoId: serviceId,           
         dataHora: dataInicio,
         dataFim: dataFim,
@@ -278,7 +285,6 @@ export class AppointmentsService {
     }
     return await prisma.agendamento.findMany({
       where: whereClause,
-      // ADICIONADO: tenant: true para o n8n saber o segmento (ícones)
       include: { cliente: true, servico: true, profissional: true, tenant: true },
       orderBy: { dataHora: 'asc' }
     });
@@ -299,6 +305,8 @@ export class AppointmentsService {
         const payload = { ...dados, whatsappInstance: tenant.whatsappInstance };
         const n8nUrl = `https://n8n.devhenri.shop/webhook/${tipo}`; 
         await lastValueFrom(this.httpService.post(n8nUrl, payload));
-    } catch (error) { console.error('Erro n8n:', error); }
+    } catch (error) {
+        console.error('Erro ao chamar n8n:', error);
+    }
   }
 }
