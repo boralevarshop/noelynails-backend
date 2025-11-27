@@ -9,7 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- ENUMS EXISTENTES ---
 enum Role {
   ADMIN_GLOBAL
   DONO_SALAO
@@ -24,17 +23,16 @@ enum StatusAgendamento {
   CONCLUIDO
 }
 
-// --- NOVO: SEGMENTOS (Para definir os ícones) ---
+// --- SEGMENTOS (NOVO) ---
 enum Segmento {
-  SALAO_BELEZA    // Padrão
-  BARBEARIA       
-  CLINICA         
-  ESTETICA        
-  PETSHOP         
-  ESTUDIO_TATTOO  
-  SERVICOS_GERAIS 
+  SALAO_BELEZA
+  BARBEARIA
+  CLINICA
+  ESTETICA
+  PETSHOP
+  ESTUDIO_TATTOO
+  SERVICOS_GERAIS
 }
-// -----------------------------------------------
 
 // SALÕES (TENANTS)
 model Tenant {
@@ -44,21 +42,20 @@ model Tenant {
   telefone         String?
   logoUrl          String?
   
-  // Personalização Visual
+  // Personalização
   corPrimaria      String    @default("#4F46E5")
   corSecundaria    String    @default("#F3F4F6")
-  
-  // --- NOVO CAMPO: SEGMENTO ---
-  segmento         Segmento  @default(SALAO_BELEZA) 
-  // ----------------------------
+  segmento         Segmento  @default(SALAO_BELEZA) // <--- CAMPO NOVO
 
-  agendamentoOnline Boolean  @default(true)
+  // Controles
+  agendamentoOnline Boolean  @default(true) // <--- CAMPO NOVO
+  whatsappInstance  String?   
 
+  // Financeiro
   plano            String    @default("FREE")     
   asaasCustomerId  String?   
   statusAssinatura String    @default("ACTIVE")   
   trialFim         DateTime? 
-  whatsappInstance String?   
   ativo            Boolean   @default(true)
 
   createdAt        DateTime  @default(now())
@@ -88,8 +85,9 @@ model Usuario {
   bio         String?
   instagram   String?
   avatarUrl   String?
-
-  aparecerNoSite Boolean @default(true) 
+  
+  // Controle Profissional
+  aparecerNoSite Boolean @default(true) // <--- CAMPO NOVO
   
   horarios    Json?    
   
@@ -108,13 +106,11 @@ model Servico {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
   nome        String
   descricao   String?
   preco       Decimal  @db.Decimal(10, 2)
   duracaoMin  Int
   diasRetorno Int      @default(30) 
-
   ativo       Boolean  @default(true)
   agendamentos Agendamento[]
   profissionais Usuario[] 
@@ -148,17 +144,14 @@ model Agendamento {
   profissional   Usuario           @relation(fields: [profissionalId], references: [id])
   servicoId      String
   servico        Servico           @relation(fields: [servicoId], references: [id])
-  
   dataHora       DateTime 
   dataFim        DateTime 
   status         StatusAgendamento @default(PENDENTE)
   observacoes    String?
   canceladoPor   String?
   lembreteEnviado Boolean          @default(false)
-
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
-
   @@index([tenantId, dataHora])
   @@map("agendamentos")
 }
@@ -174,6 +167,5 @@ model Bloqueio {
   fim            DateTime
   motivo         String? 
   createdAt      DateTime @default(now())
-
   @@map("bloqueios")
 }
