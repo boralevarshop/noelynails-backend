@@ -44,12 +44,18 @@ export class TenantsService {
             corSecundaria: true,
             logoUrl: true,
             ativo: true,
-            agendamentoOnline: true,
-            segmento: true // <--- NOVO: Retorna o segmento para o frontend saber quais ícones usar
+            agendamentoOnline: true, // Campo de controle
+            segmento: true // <--- Retorna o nicho (Barbearia, etc)
         }
     });
 
     if (!tenant) throw new NotFoundException('Salão não encontrado.');
+    
+    // Verifica se o dono fechou a agenda
+    if (!tenant.agendamentoOnline) {
+        throw new BadRequestException('O agendamento online está desativado para este salão.');
+    }
+    
     if (!tenant.ativo) throw new BadRequestException('Este salão está temporariamente indisponível.');
 
     return tenant;
@@ -57,7 +63,6 @@ export class TenantsService {
 
   // --- ATUALIZAR DADOS DO SALÃO ---
   async update(id: string, data: any) {
-    // Validação de Slug único
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
         if (existe && existe.id !== id) {
@@ -70,23 +75,23 @@ export class TenantsService {
         slug: data.slug,
         telefone: data.telefone,
         
-        // Personalização Visual e Nicho
+        // Visual e Segmento
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
-        segmento: data.segmento, // <--- NOVO: Salva se é Barbearia, Clínica, etc.
-        
+        segmento: data.segmento, // <--- Permite salvar o nicho
+
         // Integrações e Controles
         whatsappInstance: data.whatsappInstance,
-        agendamentoOnline: data.agendamentoOnline,
+        agendamentoOnline: data.agendamentoOnline, // <--- Permite ligar/desligar agenda
 
-        // Financeiro (Admin)
+        // Financeiro
         plano: data.plano,
         statusAssinatura: data.statusAssinatura,
         trialFim: data.trialFim,
         asaasCustomerId: data.asaasCustomerId
     };
 
-    // Limpa campos vazios para não apagar dados sem querer
+    // Remove campos vazios para não apagar dados existentes
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );
