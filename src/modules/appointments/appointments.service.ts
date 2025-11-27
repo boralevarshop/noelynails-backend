@@ -77,10 +77,12 @@ export class AppointmentsService {
 
     const slotsDisponiveis: string[] = [];
     
-    // --- REGRA DE 4 HORAS DE ANTECEDÊNCIA ---
-    const agora = new Date();
-    agora.setHours(agora.getHours() - 3); // Ajuste para BRT
-    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); // Agora + 4 horas
+    // --- REGRA DE 4 HORAS (VISUALIZAÇÃO) ---
+    // Define o tempo mínimo: Hora atual do servidor + 4 horas
+    const tempoMinimo = new Date();
+    tempoMinimo.setHours(tempoMinimo.getHours() + 4); 
+    // Se precisar ajustar fuso do servidor manualmente, descomente abaixo:
+    // tempoMinimo.setHours(tempoMinimo.getHours() - 3); 
     // ----------------------------------------
 
     for (let time = inicioMinutos; time <= fimMinutos - duracaoServico; time += duracaoSlots) {
@@ -93,8 +95,8 @@ export class AppointmentsService {
         const slotFim = new Date(slotInicio);
         slotFim.setMinutes(slotFim.getMinutes() + duracaoServico);
 
-        // Valida antecedência mínima (4h)
-        if (slotInicio < tempoLimite) continue;
+        // TRAVA: Se o horário for antes do mínimo (4h), não mostra na lista
+        if (slotInicio < tempoMinimo) continue;
 
         const temConflitoAgenda = agendamentos.some(ag => {
             const agIni = new Date(ag.dataHora);
@@ -125,14 +127,12 @@ export class AppointmentsService {
     for (const servico of servicos) {
       const diasParaVoltar = servico.diasRetorno || 30;
       
-      // Calcula a Data Alvo (Hoje - Dias de Retorno)
       const dataAlvo = new Date();
       dataAlvo.setDate(dataAlvo.getDate() - diasParaVoltar);
       
       const inicioDia = new Date(dataAlvo.setHours(0, 0, 0, 0));
       const fimDia = new Date(dataAlvo.setHours(23, 59, 59, 999));
 
-      // Busca atendimentos realizados nessa data específica
       const atendimentos = await prisma.agendamento.findMany({
         where: {
           tenantId,
@@ -169,18 +169,17 @@ export class AppointmentsService {
 
     if (!serviceId || !professionalId || !dataHora) throw new BadRequestException('Dados incompletos.');
 
-    // --- VALIDAÇÃO DE ANTECEDÊNCIA (4 HORAS) ---
-    const agora = new Date();
-    agora.setHours(agora.getHours() - 3); // Ajuste para BRT
-    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); // Agora + 4h
-    
+    // 1. VALIDAÇÃO DE DATA E ANTECEDÊNCIA (4 HORAS)
     const dataAgendamento = new Date(dataHora);
+    const tempoLimite = new Date();
+    tempoLimite.setHours(tempoLimite.getHours() + 4); // Agora + 4h
 
+    // Se for passado OU muito em cima da hora (menos de 4h)
     if (dataAgendamento < tempoLimite) {
         throw new BadRequestException('Agendamentos devem ser feitos com no mínimo 4 horas de antecedência.');
     }
-    // --------------------------------------------
 
+    // 2. Validação do Plano
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new BadRequestException('Salão não encontrado.');
 
@@ -204,6 +203,7 @@ export class AppointmentsService {
     const dataInicio = new Date(dataHora);
     const dataFim = new Date(dataInicio.getTime() + servico.duracaoMin * 60000);
 
+    // 3. Validação de Jornada
     const profissional = await prisma.usuario.findUnique({ where: { id: professionalId } });
     
     if (profissional && profissional.horarios) {
@@ -227,9 +227,10 @@ export class AppointmentsService {
         }
     }
 
+    // 4. Validação de Bloqueios
     const bloqueio = await prisma.bloqueio.findFirst({
         where: {
-            profissionalId: professionalId,
+            profissionalId: professionalId, 
             tenantId,
             AND: [
                 { inicio: { lt: dataFim } }, 
@@ -238,14 +239,13 @@ export class AppointmentsService {
         }
     });
 
-    if (bloqueio) {
-        throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
-    }
+    if (bloqueio) throw new BadRequestException(`Horário bloqueado: ${bloqueio.motivo || 'Indisponível'}`);
 
+    // 5. Validação de Conflito
     const conflito = await prisma.agendamento.findFirst({
       where: {
         tenantId,
-        profissionalId: professionalId,
+        profissionalId: professionalId, 
         status: { not: StatusAgendamento.CANCELADO },
         AND: [ { dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } } ]
       }
@@ -305,8 +305,6 @@ export class AppointmentsService {
         const payload = { ...dados, whatsappInstance: tenant.whatsappInstance };
         const n8nUrl = `https://n8n.devhenri.shop/webhook/${tipo}`; 
         await lastValueFrom(this.httpService.post(n8nUrl, payload));
-    } catch (error) {
-        console.error('Erro ao chamar n8n:', error);
-    }
+    } catch (error) { console.error('Erro n8n:', error); }
   }
 }
