@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -31,6 +33,7 @@ enum Segmento {
   SERVICOS_GERAIS
 }
 
+// SALÕES (TENANTS)
 model Tenant {
   id               String    @id @default(uuid())
   nome             String
@@ -38,12 +41,13 @@ model Tenant {
   telefone         String?
   logoUrl          String?
   
-  // --- PERSONALIZAÇÃO (3 CORES AGORA) ---
-  corPrimaria      String    @default("#4F46E5") // Botões, Destaques
+  // --- PERSONALIZAÇÃO VISUAL (4 CORES) ---
+  corPrimaria      String    @default("#4F46E5") // Fundo dos Botões/Topo
   corSecundaria    String    @default("#F3F4F6") // Fundo da Página
-  corTerciaria     String    @default("#FFFFFF") // Fundo dos Cards/Blocos (NOVO)
+  corTerciaria     String    @default("#FFFFFF") // Fundo dos Cards
+  corTexto         String    @default("#FFFFFF") // Cor do Texto em cima da Primária (Novo)
   // --------------------------------------
-  
+
   segmento         Segmento  @default(SALAO_BELEZA) 
   agendamentoOnline Boolean  @default(true) 
 
@@ -134,17 +138,14 @@ model Agendamento {
   profissional   Usuario           @relation(fields: [profissionalId], references: [id])
   servicoId      String
   servico        Servico           @relation(fields: [servicoId], references: [id])
-  
   dataHora       DateTime 
   dataFim        DateTime 
   status         StatusAgendamento @default(PENDENTE)
   observacoes    String?
   canceladoPor   String?
   lembreteEnviado Boolean          @default(false)
-
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
-
   @@index([tenantId, dataHora])
   @@map("agendamentos")
 }

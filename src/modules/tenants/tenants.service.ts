@@ -27,21 +27,22 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
-  // --- BUSCAR POR SLUG (PÚBLICO) ---
+  // --- BUSCAR POR SLUG ---
   async findBySlug(slug: string) {
     const tenant = await prisma.tenant.findUnique({
         where: { slug },
         select: {
             id: true, nome: true, slug: true, telefone: true,
-            // Retorna as 3 cores agora
-            corPrimaria: true, corSecundaria: true, corTerciaria: true, 
+            // TODAS AS CORES
+            corPrimaria: true, corSecundaria: true, corTerciaria: true, corTexto: true, 
+            
             logoUrl: true, ativo: true, agendamentoOnline: true, segmento: true
         }
     });
 
     if (!tenant) throw new NotFoundException('Salão não encontrado.');
-    if (!tenant.agendamentoOnline) throw new BadRequestException('Agendamento pausado.');
-    if (!tenant.ativo) throw new BadRequestException('Salão indisponível.');
+    if (!tenant.agendamentoOnline) throw new BadRequestException('O agendamento online está desativado.');
+    if (!tenant.ativo) throw new BadRequestException('Salão temporariamente indisponível.');
 
     return tenant;
   }
@@ -56,11 +57,12 @@ export class TenantsService {
     const dadosAtualizar: any = {
         nome: data.nome, slug: data.slug, telefone: data.telefone,
         
-        // Cores
-        corPrimaria: data.corPrimaria,
+        // Cores (Incluindo Texto)
+        corPrimaria: data.corPrimaria, 
         corSecundaria: data.corSecundaria,
-        corTerciaria: data.corTerciaria, // <--- NOVO
-        
+        corTerciaria: data.corTerciaria,
+        corTexto: data.corTexto, // <--- NOVO
+
         segmento: data.segmento, whatsappInstance: data.whatsappInstance,
         agendamentoOnline: data.agendamentoOnline, plano: data.plano,
         statusAssinatura: data.statusAssinatura, trialFim: data.trialFim,
