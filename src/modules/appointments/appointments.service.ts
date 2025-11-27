@@ -112,10 +112,53 @@ export class AppointmentsService {
     return slotsDisponiveis;
   }
 
-  // --- RETENÇÃO ---
+  // --- RETENÇÃO DE CLIENTES (WIN-BACK) ---
   async findRetentionCandidates(tenantId: string) {
-    // Simplificado para evitar erros de tipagem temporários se houver
-    return [];
+    const candidatos: any[] = [];
+    const servicos = await prisma.servico.findMany({ where: { tenantId, ativo: true } });
+
+    for (const servico of servicos) {
+      const diasParaVoltar = servico.diasRetorno || 30;
+      
+      // Calcula a Data Alvo (Hoje - Dias de Retorno)
+      // Ex: Se hoje é dia 30 e o retorno é 30 dias, buscamos quem veio dia 01.
+      const dataAlvo = new Date();
+      dataAlvo.setDate(dataAlvo.getDate() - diasParaVoltar);
+      
+      const inicioDia = new Date(dataAlvo.setHours(0, 0, 0, 0));
+      const fimDia = new Date(dataAlvo.setHours(23, 59, 59, 999));
+
+      // Busca atendimentos realizados nessa data específica
+      const atendimentos = await prisma.agendamento.findMany({
+        where: {
+          tenantId,
+          servicoId: servico.id,
+          status: { in: [StatusAgendamento.CONCLUIDO, StatusAgendamento.CONFIRMADO] },
+          dataHora: { gte: inicioDia, lte: fimDia },
+          lembreteEnviado: false // Só quem ainda não recebeu aviso
+        },
+        include: { cliente: true, servico: true, profissional: true, tenant: true }
+      });
+
+      for (const ag of atendimentos) {
+        // Verifica se o cliente JÁ agendou algo para o futuro (se sim, não incomoda)
+        const temFuturo = await prisma.agendamento.findFirst({
+          where: {
+            tenantId,
+            clienteId: ag.clienteId,
+            dataHora: { gt: new Date() }, 
+            status: { not: StatusAgendamento.CANCELADO }
+          }
+        });
+
+        if (!temFuturo) {
+          candidatos.push(ag);
+          // Marca que avisamos para não mandar de novo amanhã
+          await prisma.agendamento.update({ where: { id: ag.id }, data: { lembreteEnviado: true } });
+        }
+      }
+    }
+    return candidatos;
   }
 
   // --- CRIAÇÃO DE AGENDAMENTO ---
