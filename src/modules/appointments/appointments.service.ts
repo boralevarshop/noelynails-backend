@@ -28,7 +28,7 @@ export class AppointmentsService {
     });
   }
 
-  // --- CALCULADORA DE DISPONIBILIDADE (Mantém regra de 4h para visualização pública) ---
+  // --- CALCULADORA DE DISPONIBILIDADE ---
   async getAvailableSlots(tenantId: string, professionalId: string, date: string, serviceId: string) {
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
     const profissional = await prisma.usuario.findUnique({ where: { id: professionalId } });
@@ -38,6 +38,7 @@ export class AppointmentsService {
     const duracaoSlots = 30; 
     const duracaoServico = servico.duracaoMin;
     
+    // Ajuste de Fuso para identificar dia da semana
     const diaAlvo = new Date(`${date}T12:00:00-03:00`);
     const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
     const diaSemana = diasMap[diaAlvo.getDay()];
@@ -56,6 +57,7 @@ export class AppointmentsService {
     const inicioDoDiaISO = new Date(`${date}T00:00:00-03:00`).toISOString();
     const fimDoDiaISO = new Date(`${date}T23:59:59-03:00`).toISOString();
 
+    // Busca Agendamentos
     const agendamentos = await prisma.agendamento.findMany({
         where: {
             profissionalId: professionalId,
@@ -64,6 +66,7 @@ export class AppointmentsService {
         }
     });
 
+    // Busca Bloqueios
     const bloqueios = await prisma.bloqueio.findMany({
         where: {
             profissionalId: professionalId,
@@ -74,9 +77,11 @@ export class AppointmentsService {
 
     const slotsDisponiveis: string[] = [];
     
+    // --- REGRA DE 4 HORAS (VISUALIZAÇÃO) ---
     const agora = new Date();
-    agora.setHours(agora.getHours() - 3); 
-    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); 
+    agora.setHours(agora.getHours() - 3); // Ajuste para BRT
+    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); // Agora + 4h
+    // ----------------------------------------
 
     for (let time = inicioMinutos; time <= fimMinutos - duracaoServico; time += duracaoSlots) {
         const slotHora = Math.floor(time / 60);
@@ -88,7 +93,7 @@ export class AppointmentsService {
         const slotFim = new Date(slotInicio);
         slotFim.setMinutes(slotFim.getMinutes() + duracaoServico);
 
-        // Regra de Visualização: Esconde horários muito próximos
+        // Valida antecedência mínima (4h)
         if (slotInicio < tempoLimite) continue;
 
         const temConflitoAgenda = agendamentos.some(ag => {
@@ -112,6 +117,7 @@ export class AppointmentsService {
     return slotsDisponiveis;
   }
 
+  // --- RETENÇÃO DE CLIENTES (WIN-BACK) ---
   async findRetentionCandidates(tenantId: string) {
     const candidatos: any[] = [];
     const servicos = await prisma.servico.findMany({ where: { tenantId, ativo: true } });
@@ -153,7 +159,7 @@ export class AppointmentsService {
     return candidatos;
   }
 
-  // --- CRIAÇÃO DE AGENDAMENTO (ATUALIZADO) ---
+  // --- CRIAÇÃO DE AGENDAMENTO ---
   async create(data: any) {
     const { tenantId, nomeCliente, telefoneCliente, serviceId, professionalId, dataHora, isInternal } = data;
 
