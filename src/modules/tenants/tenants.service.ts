@@ -8,7 +8,11 @@ export class TenantsService {
   
   async findAll() {
     return await prisma.tenant.findMany({
-      include: { _count: { select: { usuarios: true, agendamentos: true } } },
+      include: {
+        _count: {
+          select: { usuarios: true, agendamentos: true } 
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
   }
@@ -23,33 +27,50 @@ export class TenantsService {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
+  // --- BUSCAR POR SLUG (PÚBLICO) ---
   async findBySlug(slug: string) {
     const tenant = await prisma.tenant.findUnique({
         where: { slug },
         select: {
             id: true, nome: true, slug: true, telefone: true,
-            corPrimaria: true, corSecundaria: true, logoUrl: true,
-            ativo: true, agendamentoOnline: true, segmento: true
+            // Retorna as 3 cores agora
+            corPrimaria: true, corSecundaria: true, corTerciaria: true, 
+            logoUrl: true, ativo: true, agendamentoOnline: true, segmento: true
         }
     });
+
     if (!tenant) throw new NotFoundException('Salão não encontrado.');
-    if (!tenant.agendamentoOnline) throw new BadRequestException('Agendamento online desativado.');
-    if (!tenant.ativo) throw new BadRequestException('Salão temporariamente indisponível.');
+    if (!tenant.agendamentoOnline) throw new BadRequestException('Agendamento pausado.');
+    if (!tenant.ativo) throw new BadRequestException('Salão indisponível.');
+
     return tenant;
   }
 
+  // --- ATUALIZAR DADOS ---
   async update(id: string, data: any) {
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
         if (existe && existe.id !== id) throw new BadRequestException('Slug em uso.');
     }
+
     const dadosAtualizar: any = {
         nome: data.nome, slug: data.slug, telefone: data.telefone,
-        corPrimaria: data.corPrimaria, corSecundaria: data.corSecundaria, segmento: data.segmento,
-        whatsappInstance: data.whatsappInstance, agendamentoOnline: data.agendamentoOnline,
-        plano: data.plano, statusAssinatura: data.statusAssinatura, trialFim: data.trialFim, asaasCustomerId: data.asaasCustomerId
+        
+        // Cores
+        corPrimaria: data.corPrimaria,
+        corSecundaria: data.corSecundaria,
+        corTerciaria: data.corTerciaria, // <--- NOVO
+        
+        segmento: data.segmento, whatsappInstance: data.whatsappInstance,
+        agendamentoOnline: data.agendamentoOnline, plano: data.plano,
+        statusAssinatura: data.statusAssinatura, trialFim: data.trialFim,
+        asaasCustomerId: data.asaasCustomerId
     };
-    Object.keys(dadosAtualizar).forEach(key => dadosAtualizar[key] === undefined && delete dadosAtualizar[key]);
+
+    Object.keys(dadosAtualizar).forEach(key => 
+        dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
+    );
+
     return await prisma.tenant.update({ where: { id }, data: dadosAtualizar });
   }
 

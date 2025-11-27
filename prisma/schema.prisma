@@ -38,8 +38,12 @@ model Tenant {
   telefone         String?
   logoUrl          String?
   
-  corPrimaria      String    @default("#4F46E5")
-  corSecundaria    String    @default("#F3F4F6")
+  // --- PERSONALIZAÇÃO (3 CORES AGORA) ---
+  corPrimaria      String    @default("#4F46E5") // Botões, Destaques
+  corSecundaria    String    @default("#F3F4F6") // Fundo da Página
+  corTerciaria     String    @default("#FFFFFF") // Fundo dos Cards/Blocos (NOVO)
+  // --------------------------------------
+  
   segmento         Segmento  @default(SALAO_BELEZA) 
   agendamentoOnline Boolean  @default(true) 
 
