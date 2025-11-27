@@ -25,10 +25,6 @@ export class UsersService {
         instagram: data.instagram,
         avatarUrl: data.avatarUrl,
         
-        // --- CAMPO NOVO: CONTROLE DE VISIBILIDADE ---
-        aparecerNoSite: data.aparecerNoSite, // Aceita true ou false
-        // --------------------------------------------
-
         // Atualiza Horários de Trabalho (JSON)
         horarios: data.horarios,
 

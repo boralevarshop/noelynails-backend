@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'; // Adicionei NotFoundException
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -44,23 +44,19 @@ export class TenantsService {
             corSecundaria: true,
             logoUrl: true,
             ativo: true,
-            agendamentoOnline: true, 
-            segmento: true // <--- Importante: Retorna o nicho para o site saber qual ícone usar
+            agendamentoOnline: true
         }
     });
 
+    // MUDANÇA AQUI: De BadRequest (400) para NotFound (404)
     if (!tenant) throw new NotFoundException('Salão não encontrado.');
-    
-    if (!tenant.agendamentoOnline) {
-        throw new BadRequestException('O agendamento online está desativado para este salão.');
-    }
     
     if (!tenant.ativo) throw new BadRequestException('Este salão está temporariamente indisponível.');
 
     return tenant;
   }
+  // ---------------------------------------
 
-  // --- ATUALIZAR DADOS DO SALÃO ---
   async update(id: string, data: any) {
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
@@ -73,24 +69,16 @@ export class TenantsService {
         nome: data.nome,
         slug: data.slug,
         telefone: data.telefone,
-        
-        // Visual e Nicho
         corPrimaria: data.corPrimaria,
         corSecundaria: data.corSecundaria,
-        segmento: data.segmento, // <--- OBRIGATÓRIO: Salva se é Barbearia, Clínica, etc.
-        
-        // Integrações e Controles
         whatsappInstance: data.whatsappInstance,
-        agendamentoOnline: data.agendamentoOnline,
-
-        // Financeiro
         plano: data.plano,
         statusAssinatura: data.statusAssinatura,
         trialFim: data.trialFim,
-        asaasCustomerId: data.asaasCustomerId
+        asaasCustomerId: data.asaasCustomerId,
+        agendamentoOnline: data.agendamentoOnline 
     };
 
-    // Limpa campos vazios
     Object.keys(dadosAtualizar).forEach(key => 
         dadosAtualizar[key] === undefined && delete dadosAtualizar[key]
     );
