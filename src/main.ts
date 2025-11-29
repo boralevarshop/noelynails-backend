@@ -1,20 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { json, urlencoded } from 'express'; // <--- IMPORTANTE
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Habilita o CORS para que o Frontend (em outro domínio) consiga acessar
-  app.enableCors({
-    origin: true, // Em produção, trocaremos isso pelo domínio exato
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-  });
+  // --- AUMENTANDO O LIMITE DE UPLOAD ---
+  // Isso permite enviar fotos convertidas em texto (Base64)
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
+  // -------------------------------------
 
-  // Pega a porta do ambiente ou usa 3000
-  const port = process.env.PORT || 3000;
+  app.enableCors();
   
-  await app.listen(port);
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  await app.listen(3000);
 }
 bootstrap();
