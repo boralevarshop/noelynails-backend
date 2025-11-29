@@ -7,6 +7,7 @@ export class ServicesController {
 
   @Post()
   create(@Body() data: any) {
+    // O frontend vai mandar o usuarioId junto
     return this.servicesService.create(data);
   }
 
@@ -15,15 +16,14 @@ export class ServicesController {
     return this.servicesService.findAllByTenant(tenantId);
   }
 
-  // --- NOVA ROTA DE EDIÇÃO ---
   @Patch(':id')
   update(@Param('id') id: string, @Body() data: any) {
     return this.servicesService.update(id, data);
   }
-  // ---------------------------
 
+  // Deletar agora recebe body para saber QUEM deletou
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.servicesService.remove(id);
+  remove(@Param('id') id: string, @Body() data: any) {
+    return this.servicesService.remove(id, data?.usuarioId);
   }
 }

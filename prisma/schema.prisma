@@ -33,7 +33,6 @@ enum Segmento {
   SERVICOS_GERAIS
 }
 
-// SALÕES (TENANTS)
 model Tenant {
   id               String    @id @default(uuid())
   nome             String
@@ -41,13 +40,11 @@ model Tenant {
   telefone         String?
   logoUrl          String?
   
-  // --- PERSONALIZAÇÃO VISUAL (4 CORES) ---
-  corPrimaria      String    @default("#4F46E5") // Fundo dos Botões/Topo
-  corSecundaria    String    @default("#F3F4F6") // Fundo da Página
-  corTerciaria     String    @default("#FFFFFF") // Fundo dos Cards
-  corTexto         String    @default("#FFFFFF") // Cor do Texto em cima da Primária (Novo)
-  // --------------------------------------
-
+  corPrimaria      String    @default("#4F46E5")
+  corSecundaria    String    @default("#F3F4F6")
+  corTerciaria     String    @default("#FFFFFF")
+  corTexto         String    @default("#FFFFFF")
+  
   segmento         Segmento  @default(SALAO_BELEZA) 
   agendamentoOnline Boolean  @default(true) 
 
@@ -90,7 +87,12 @@ model Usuario {
   
   agendamentos      Agendamento[] 
   bloqueios         Bloqueio[]
-  servicosQueAtende Servico[] 
+  servicosQueAtende Servico[] @relation("ProfissionalServicos")
+
+  // --- NOVOS CAMPOS DE AUDITORIA ---
+  servicosCriados    Servico[] @relation("CriadorServico")
+  servicosAtualizados Servico[] @relation("AtualizadorServico")
+  // ---------------------------------
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -102,14 +104,28 @@ model Servico {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
   nome        String
   descricao   String?
   preco       Decimal  @db.Decimal(10, 2)
   duracaoMin  Int
   diasRetorno Int      @default(30) 
+  
   ativo       Boolean  @default(true)
+
+  // --- AUDITORIA (QUEM MEXEU?) ---
+  createdById  String?
+  createdBy    Usuario? @relation("CriadorServico", fields: [createdById], references: [id])
+  
+  updatedById  String?
+  updatedBy    Usuario? @relation("AtualizadorServico", fields: [updatedById], references: [id])
+  // ------------------------------
+
   agendamentos Agendamento[]
-  profissionais Usuario[] 
+  profissionais Usuario[] @relation("ProfissionalServicos")
+
+  createdAt    DateTime @default(now()) // Importante para saber quando foi criado
+  updatedAt    DateTime @updatedAt      // Importante para saber a última edição
 
   @@map("servicos")
 }
