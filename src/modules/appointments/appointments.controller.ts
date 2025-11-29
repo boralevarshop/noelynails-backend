@@ -10,7 +10,7 @@ export class AppointmentsController {
     return this.appointmentsService.create(data);
   }
 
-  // --- ROTA DE DISPONIBILIDADE (CRUCIAL PARA A AGENDA PÚBLICA) ---
+  // Rota de Disponibilidade (Pública)
   @Get('availability')
   getAvailability(
     @Query('tenantId') tenantId: string,
@@ -18,15 +18,20 @@ export class AppointmentsController {
     @Query('date') date: string,
     @Query('serviceId') serviceId: string
   ) {
-    // Chama a calculadora no Service
     return this.appointmentsService.getAvailableSlots(tenantId, professionalId, date, serviceId);
   }
-  // -----------------------------------------------------------------
 
+  // --- ATUALIZADO: Aceita range de datas (start/end) ---
   @Get('tenant/:tenantId')
-  findAll(@Param('tenantId') tenantId: string, @Query('date') date?: string) {
-    return this.appointmentsService.findAllByTenant(tenantId, date);
+  findAll(
+      @Param('tenantId') tenantId: string, 
+      @Query('date') date?: string,
+      @Query('startDate') startDate?: string,
+      @Query('endDate') endDate?: string
+  ) {
+    return this.appointmentsService.findAllByTenant(tenantId, date, startDate, endDate);
   }
+  // -----------------------------------------------------
 
   @Get('retention/:tenantId')
   findRetention(@Param('tenantId') tenantId: string) {

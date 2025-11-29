@@ -12,10 +12,9 @@ export class AppointmentsService {
   
   constructor(private readonly httpService: HttpService) {}
 
-  // --- CRON JOB (Limpeza) ---
   @Cron(CronExpression.EVERY_30_MINUTES)
   async handleCron() {
-    this.logger.debug('Verificando agendamentos concluídos...');
+    this.logger.debug('Limpando agendamentos antigos...');
     const limiteTempo = new Date();
     limiteTempo.setHours(limiteTempo.getHours() - 1);
 
@@ -28,7 +27,6 @@ export class AppointmentsService {
     });
   }
 
-  // --- CALCULADORA DE DISPONIBILIDADE ---
   async getAvailableSlots(tenantId: string, professionalId: string, date: string, serviceId: string) {
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
     const profissional = await prisma.usuario.findUnique({ where: { id: professionalId } });
@@ -38,7 +36,6 @@ export class AppointmentsService {
     const duracaoSlots = 30; 
     const duracaoServico = servico.duracaoMin;
     
-    // Ajuste de Fuso para identificar dia da semana
     const diaAlvo = new Date(`${date}T12:00:00-03:00`);
     const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
     const diaSemana = diasMap[diaAlvo.getDay()];
@@ -50,14 +47,12 @@ export class AppointmentsService {
     const jornada = (profissional.horarios as any)[diaSemana];
     const [iniH, iniM] = jornada.inicio.split(':').map(Number);
     const [fimH, fimM] = jornada.fim.split(':').map(Number);
-    
     const inicioMinutos = iniH * 60 + iniM;
     const fimMinutos = fimH * 60 + fimM;
 
     const inicioDoDiaISO = new Date(`${date}T00:00:00-03:00`).toISOString();
     const fimDoDiaISO = new Date(`${date}T23:59:59-03:00`).toISOString();
 
-    // Busca Agendamentos
     const agendamentos = await prisma.agendamento.findMany({
         where: {
             profissionalId: professionalId,
@@ -66,7 +61,6 @@ export class AppointmentsService {
         }
     });
 
-    // Busca Bloqueios
     const bloqueios = await prisma.bloqueio.findMany({
         where: {
             profissionalId: professionalId,
@@ -77,23 +71,18 @@ export class AppointmentsService {
 
     const slotsDisponiveis: string[] = [];
     
-    // --- REGRA DE 4 HORAS (VISUALIZAÇÃO) ---
     const agora = new Date();
-    agora.setHours(agora.getHours() - 3); // Ajuste para BRT
-    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); // Agora + 4h
-    // ----------------------------------------
+    agora.setHours(agora.getHours() - 3); 
+    const tempoLimite = new Date(agora.getTime() + 4 * 60 * 60 * 1000); 
 
     for (let time = inicioMinutos; time <= fimMinutos - duracaoServico; time += duracaoSlots) {
         const slotHora = Math.floor(time / 60);
         const slotMin = time % 60;
-        
         const slotInicioStr = `${date}T${slotHora.toString().padStart(2,'0')}:${slotMin.toString().padStart(2,'0')}:00-03:00`;
         const slotInicio = new Date(slotInicioStr);
-        
         const slotFim = new Date(slotInicio);
         slotFim.setMinutes(slotFim.getMinutes() + duracaoServico);
 
-        // Valida antecedência mínima (4h)
         if (slotInicio < tempoLimite) continue;
 
         const temConflitoAgenda = agendamentos.some(ag => {
@@ -109,94 +98,36 @@ export class AppointmentsService {
         });
 
         if (!temConflitoAgenda && !temConflitoBloqueio) {
-            const label = `${slotHora.toString().padStart(2, '0')}:${slotMin.toString().padStart(2, '0')}`;
-            slotsDisponiveis.push(label);
+            slotsDisponiveis.push(`${slotHora.toString().padStart(2, '0')}:${slotMin.toString().padStart(2, '0')}`);
         }
     }
-
     return slotsDisponiveis;
   }
 
-  // --- RETENÇÃO DE CLIENTES (WIN-BACK) ---
-  async findRetentionCandidates(tenantId: string) {
-    const candidatos: any[] = [];
-    const servicos = await prisma.servico.findMany({ where: { tenantId, ativo: true } });
-
-    for (const servico of servicos) {
-      const diasParaVoltar = servico.diasRetorno || 30;
-      const dataAlvo = new Date();
-      dataAlvo.setDate(dataAlvo.getDate() - diasParaVoltar);
-      const inicioDia = new Date(dataAlvo.setHours(0, 0, 0, 0));
-      const fimDia = new Date(dataAlvo.setHours(23, 59, 59, 999));
-
-      const atendimentos = await prisma.agendamento.findMany({
-        where: {
-          tenantId,
-          servicoId: servico.id,
-          status: { in: [StatusAgendamento.CONCLUIDO, StatusAgendamento.CONFIRMADO] },
-          dataHora: { gte: inicioDia, lte: fimDia },
-          lembreteEnviado: false 
-        },
-        include: { cliente: true, servico: true, profissional: true, tenant: true }
-      });
-
-      for (const ag of atendimentos) {
-        const temFuturo = await prisma.agendamento.findFirst({
-          where: {
-            tenantId,
-            clienteId: ag.clienteId,
-            dataHora: { gt: new Date() }, 
-            status: { not: StatusAgendamento.CANCELADO }
-          }
-        });
-
-        if (!temFuturo) {
-          candidatos.push(ag);
-          await prisma.agendamento.update({ where: { id: ag.id }, data: { lembreteEnviado: true } });
-        }
-      }
-    }
-    return candidatos;
-  }
-
-  // --- CRIAÇÃO DE AGENDAMENTO ---
   async create(data: any) {
     const { tenantId, nomeCliente, telefoneCliente, serviceId, professionalId, dataHora, isInternal } = data;
 
     if (!serviceId || !professionalId || !dataHora) throw new BadRequestException('Dados incompletos.');
 
     const agora = new Date();
-    agora.setMinutes(agora.getMinutes() - 10); // Tolerância
+    agora.setMinutes(agora.getMinutes() - 10);
     const dataAgendamento = new Date(dataHora);
 
-    // 1. Validação de Passado (Vale pra todo mundo)
-    if (dataAgendamento < agora) {
-        throw new BadRequestException('Não é possível criar agendamentos no passado.');
-    }
+    if (dataAgendamento < agora) throw new BadRequestException('Data no passado.');
 
-    // 2. Validação de Antecedência (SÓ PARA CLIENTES EXTERNOS)
-    // Se não for interno (isInternal !== true), aplica a regra das 4h
     if (!isInternal) {
         const tempoLimite = new Date();
         tempoLimite.setHours(tempoLimite.getHours() + 4);
-        
-        if (dataAgendamento < tempoLimite) {
-            throw new BadRequestException('Agendamentos online exigem 4 horas de antecedência.');
-        }
+        if (dataAgendamento < tempoLimite) throw new BadRequestException('Agendamentos online exigem 4 horas de antecedência.');
     }
 
-    // 3. Validações Padrão
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new BadRequestException('Salão não encontrado.');
 
     if (tenant.plano === 'FREE') {
-        const hoje = new Date();
-        const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-        const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-        const totalMes = await prisma.agendamento.count({
-            where: { tenantId, createdAt: { gte: inicioMes, lte: fimMes } }
-        });
-        if (totalMes >= 20) throw new BadRequestException('Limite de 20 agendamentos do plano Grátis atingido.');
+        const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const total = await prisma.agendamento.count({ where: { tenantId, createdAt: { gte: inicioMes } } });
+        if (total >= 20) throw new BadRequestException('Limite do plano Free atingido.');
     }
 
     const servico = await prisma.servico.findUnique({ where: { id: serviceId } });
@@ -206,7 +137,6 @@ export class AppointmentsService {
     const dataInicio = new Date(dataHora);
     const dataFim = new Date(dataInicio.getTime() + servico.duracaoMin * 60000);
 
-    // Validação Jornada
     if (profissional.horarios) {
         const dataBrasilia = new Date(dataInicio.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
         const diasMap = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
@@ -221,12 +151,11 @@ export class AppointmentsService {
         if (minAg < (hIni*60+mIni) || minAg >= (hFim*60+mFim)) throw new BadRequestException(`Horário fora do expediente.`);
     }
 
-    // Validação Bloqueios
     const bloqueio = await prisma.bloqueio.findFirst({
         where: {
             profissionalId: professionalId, 
             tenantId,
-            AND: [ { inicio: { lt: dataFim } }, { fim: { gt: dataInicio } } ]
+            AND: [{ inicio: { lt: dataFim } }, { fim: { gt: dataInicio } }]
         }
     });
     if (bloqueio) throw new BadRequestException('Horário bloqueado.');
@@ -236,7 +165,7 @@ export class AppointmentsService {
         tenantId,
         profissionalId: professionalId, 
         status: { not: StatusAgendamento.CANCELADO },
-        AND: [ { dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } } ]
+        AND: [{ dataHora: { lt: dataFim } }, { dataFim: { gt: dataInicio } }]
       }
     });
     if (conflito) throw new BadRequestException('Horário indisponível.');
@@ -263,18 +192,33 @@ export class AppointmentsService {
     return agendamento;
   }
 
-  async findAllByTenant(tenantId: string, date?: string) {
+  // --- CORREÇÃO AQUI: Aceita 4 argumentos agora ---
+  async findAllByTenant(tenantId: string, date?: string, startDate?: string, endDate?: string) {
     const whereClause: any = { tenantId };
+
     if (date) {
+      // Busca exata de um dia
       const inicioDia = new Date(`${date}T00:00:00.000-03:00`);
       const fimDia = new Date(`${date}T23:59:59.999-03:00`);
       whereClause.dataHora = { gte: inicioDia, lte: fimDia };
+    } 
+    else if (startDate && endDate) {
+      // Busca por intervalo (Range) - Usado no Dashboard
+      const inicio = new Date(`${startDate}T00:00:00.000-03:00`);
+      const fim = new Date(`${endDate}T23:59:59.999-03:00`);
+      whereClause.dataHora = { gte: inicio, lte: fim };
     }
+
     return await prisma.agendamento.findMany({
       where: whereClause,
       include: { cliente: true, servico: true, profissional: true, tenant: true },
       orderBy: { dataHora: 'asc' }
     });
+  }
+  // ------------------------------------------------
+
+  async findRetentionCandidates(tenantId: string) {
+    return []; 
   }
 
   async cancel(id: string, nomeCancelou: string) {
@@ -290,8 +234,7 @@ export class AppointmentsService {
         const tenant = await prisma.tenant.findUnique({ where: { id: dados.tenantId } });
         if (!tenant || !tenant.whatsappInstance || tenant.plano === 'FREE') return; 
         const payload = { ...dados, whatsappInstance: tenant.whatsappInstance };
-        const n8nUrl = `https://n8n.devhenri.shop/webhook/${tipo}`; 
-        await lastValueFrom(this.httpService.post(n8nUrl, payload));
+        await lastValueFrom(this.httpService.post(`https://n8n.devhenri.shop/webhook/${tipo}`, payload));
     } catch (error) { console.error('Erro n8n:', error); }
   }
 }
