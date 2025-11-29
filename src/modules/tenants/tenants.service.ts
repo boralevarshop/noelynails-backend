@@ -8,11 +8,7 @@ export class TenantsService {
   
   async findAll() {
     return await prisma.tenant.findMany({
-      include: {
-        _count: {
-          select: { usuarios: true, agendamentos: true } 
-        }
-      },
+      include: { _count: { select: { usuarios: true, agendamentos: true } } },
       orderBy: { createdAt: 'desc' }
     });
   }
@@ -23,19 +19,18 @@ export class TenantsService {
     return await prisma.tenant.update({ where: { id }, data: { ativo: !tenant.ativo } });
   }
 
+  // --- USADO PELO PAINEL (TRAZ AS CORES) ---
   async findOne(id: string) {
     return await prisma.tenant.findUnique({ where: { id } });
   }
 
-  // --- BUSCAR POR SLUG ---
+  // --- USADO PELO SITE PÚBLICO (TRAZ AS CORES) ---
   async findBySlug(slug: string) {
     const tenant = await prisma.tenant.findUnique({
         where: { slug },
         select: {
             id: true, nome: true, slug: true, telefone: true,
-            // TODAS AS CORES
-            corPrimaria: true, corSecundaria: true, corTerciaria: true, corTexto: true, 
-            
+            corPrimaria: true, corSecundaria: true, corTerciaria: true, corTexto: true,
             logoUrl: true, ativo: true, agendamentoOnline: true, segmento: true
         }
     });
@@ -47,7 +42,6 @@ export class TenantsService {
     return tenant;
   }
 
-  // --- ATUALIZAR DADOS ---
   async update(id: string, data: any) {
     if (data.slug) {
         const existe = await prisma.tenant.findUnique({ where: { slug: data.slug } });
@@ -56,13 +50,8 @@ export class TenantsService {
 
     const dadosAtualizar: any = {
         nome: data.nome, slug: data.slug, telefone: data.telefone,
-        
-        // Cores (Incluindo Texto)
-        corPrimaria: data.corPrimaria, 
-        corSecundaria: data.corSecundaria,
-        corTerciaria: data.corTerciaria,
-        corTexto: data.corTexto, // <--- NOVO
-
+        corPrimaria: data.corPrimaria, corSecundaria: data.corSecundaria, 
+        corTerciaria: data.corTerciaria, corTexto: data.corTexto,
         segmento: data.segmento, whatsappInstance: data.whatsappInstance,
         agendamentoOnline: data.agendamentoOnline, plano: data.plano,
         statusAssinatura: data.statusAssinatura, trialFim: data.trialFim,
