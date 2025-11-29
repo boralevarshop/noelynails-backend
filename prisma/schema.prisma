@@ -33,6 +33,7 @@ enum Segmento {
   SERVICOS_GERAIS
 }
 
+// SALÕES (TENANTS)
 model Tenant {
   id               String    @id @default(uuid())
   nome             String
@@ -56,7 +57,8 @@ model Tenant {
   ativo            Boolean   @default(true)
 
   createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  // ALTERADO PARA NÃO DAR ERRO
+  updatedAt        DateTime  @default(now()) @updatedAt 
 
   usuarios         Usuario[]
   servicos         Servico[]
@@ -67,6 +69,7 @@ model Tenant {
   @@map("tenants")
 }
 
+// USUÁRIOS
 model Usuario {
   id          String   @id @default(uuid())
   tenantId    String
@@ -87,19 +90,19 @@ model Usuario {
   
   agendamentos      Agendamento[] 
   bloqueios         Bloqueio[]
-  servicosQueAtende Servico[] @relation("ProfissionalServicos")
-
-  // --- NOVOS CAMPOS DE AUDITORIA ---
+  servicosQueAtende Servico[] 
+  
   servicosCriados    Servico[] @relation("CriadorServico")
   servicosAtualizados Servico[] @relation("AtualizadorServico")
-  // ---------------------------------
 
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // ALTERADO PARA NÃO DAR ERRO
+  updatedAt   DateTime @default(now()) @updatedAt 
 
   @@map("usuarios")
 }
 
+// SERVIÇOS
 model Servico {
   id          String   @id @default(uuid())
   tenantId    String
@@ -113,23 +116,23 @@ model Servico {
   
   ativo       Boolean  @default(true)
 
-  // --- AUDITORIA (QUEM MEXEU?) ---
   createdById  String?
   createdBy    Usuario? @relation("CriadorServico", fields: [createdById], references: [id])
   
   updatedById  String?
   updatedBy    Usuario? @relation("AtualizadorServico", fields: [updatedById], references: [id])
-  // ------------------------------
 
   agendamentos Agendamento[]
-  profissionais Usuario[] @relation("ProfissionalServicos")
+  profissionais Usuario[] 
 
-  createdAt    DateTime @default(now()) // Importante para saber quando foi criado
-  updatedAt    DateTime @updatedAt      // Importante para saber a última edição
+  createdAt    DateTime @default(now())
+  // ALTERADO PARA NÃO DAR ERRO
+  updatedAt    DateTime @default(now()) @updatedAt 
 
   @@map("servicos")
 }
 
+// CLIENTES
 model Cliente {
   id          String   @id @default(uuid())
   tenantId    String
@@ -138,12 +141,16 @@ model Cliente {
   telefone    String   
   email       String?
   agendamentos Agendamento[]
+  
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // ALTERADO PARA NÃO DAR ERRO
+  updatedAt   DateTime @default(now()) @updatedAt 
+
   @@unique([tenantId, telefone])
   @@map("clientes")
 }
 
+// AGENDAMENTOS
 model Agendamento {
   id             String            @id @default(uuid())
   tenantId       String
@@ -154,18 +161,23 @@ model Agendamento {
   profissional   Usuario           @relation(fields: [profissionalId], references: [id])
   servicoId      String
   servico        Servico           @relation(fields: [servicoId], references: [id])
+  
   dataHora       DateTime 
   dataFim        DateTime 
   status         StatusAgendamento @default(PENDENTE)
   observacoes    String?
   canceladoPor   String?
   lembreteEnviado Boolean          @default(false)
+  
   createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  // ALTERADO PARA NÃO DAR ERRO
+  updatedAt      DateTime          @default(now()) @updatedAt 
+
   @@index([tenantId, dataHora])
   @@map("agendamentos")
 }
 
+// BLOQUEIOS
 model Bloqueio {
   id             String   @id @default(uuid())
   tenantId       String
