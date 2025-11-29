@@ -9,83 +9,99 @@ export class ProfessionalsService {
   async create(data: any) {
     const { nome, email, telefone, tenantId } = data;
 
-    // 1. Busca o plano do salão
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    
     if (!tenant) throw new BadRequestException('Salão não encontrado.');
-
-    // 2. Conta quantos funcionários (role PROFISSIONAL) já existem
+    
     const totalProfissionais = await prisma.usuario.count({
-        where: { 
-            tenantId, 
-            role: 'PROFISSIONAL' 
-        }
+        where: { tenantId, role: 'PROFISSIONAL' }
     });
 
-    // 3. REGRAS DE LIMITES POR PLANO
-    let limiteExtras = 0; // Padrão (Free/Individual = Só o dono)
-    
-    if (tenant.plano === 'FREE') limiteExtras = 0;       // Só o dono
-    if (tenant.plano === 'INDIVIDUAL') limiteExtras = 0; // Só o dono
-    if (tenant.plano === 'PRIME') limiteExtras = 3;      // Dono + 3 = 4
-    if (tenant.plano === 'SUPREME') limiteExtras = 999;  // Ilimitado
+    // Limites do Plano
+    let limite = 1; 
+    if (tenant.plano === 'PRIME') limite = 4;
+    if (tenant.plano === 'SUPREME') limite = 999;
 
-    // 4. Trava
-    if (totalProfissionais >= limiteExtras) {
-        throw new BadRequestException(`O plano ${tenant.plano} não permite adicionar mais membros à equipe. Faça um Upgrade!`);
+    if (totalProfissionais >= limite) {
+        throw new BadRequestException(`Seu plano ${tenant.plano} permite apenas ${limite} profissionais.`);
     }
 
-    // 5. Verifica se email já existe
+    // --- VALIDAÇÕES DE DUPLICIDADE ---
     const emailExiste = await prisma.usuario.findUnique({ where: { email } });
-    if (emailExiste) {
-      throw new BadRequestException('Este email já está cadastrado no sistema.');
-    }
+    if (emailExiste) throw new BadRequestException('Este email já está cadastrado.');
 
-    // 6. Cria o usuário
+    const telExiste = await prisma.usuario.findFirst({ where: { tenantId, telefone } });
+    if (telExiste) throw new BadRequestException('Este telefone já está cadastrado.');
+
+    const nomeExiste = await prisma.usuario.findFirst({ 
+        where: { tenantId, nome: { equals: nome, mode: 'insensitive' } } 
+    });
+    if (nomeExiste) throw new BadRequestException(`Já existe um profissional chamado "${nome}".`);
+    // ---------------------------------
+
     return await prisma.usuario.create({
       data: {
-        nome,
-        email,
-        telefone,
-        senha: '123', 
-        role: 'PROFISSIONAL',
-        tenantId,
+        nome, email, telefone, senha: '123', role: 'PROFISSIONAL', tenantId,
       },
     });
   }
 
-  // --- ATUALIZADO: BUSCA INTELIGENTE ---
   async findAllByTenant(tenantId: string, serviceId?: string) {
     const whereClause: any = {
       tenantId: tenantId,
       role: { in: [Role.PROFISSIONAL, Role.DONO_SALAO] } 
     };
 
-    // Se um serviço foi especificado (Fluxo de Agendamento Público)
     if (serviceId) {
-        // 1. Filtra apenas quem realiza este serviço
-        whereClause.servicosQueAtende = {
-            some: { id: serviceId }
-        };
-        
-        // 2. Filtra apenas quem permitiu aparecer no site
+        whereClause.servicosQueAtende = { some: { id: serviceId } };
         whereClause.aparecerNoSite = true;
     }
 
     return await prisma.usuario.findMany({
       where: whereClause,
+      // Inclui histórico para o painel do dono
+      include: {
+        agendamentos: {
+            orderBy: { dataHora: 'desc' },
+            include: { servico: true, cliente: true }
+        }
+      },
       orderBy: { nome: 'asc' } 
     });
   }
-  // -------------------------------------
+
+  // --- ATUALIZAR PROFISSIONAL ---
+  async update(id: string, data: any) {
+    const current = await prisma.usuario.findUnique({ where: { id } });
+    if (!current) throw new BadRequestException('Profissional não encontrado.');
+
+    // Validações na Edição (ignora o próprio ID)
+    if (data.email && data.email !== current.email) {
+        const exists = await prisma.usuario.findUnique({ where: { email: data.email } });
+        if (exists) throw new BadRequestException('Email já em uso.');
+    }
+    if (data.telefone && data.telefone !== current.telefone) {
+        const exists = await prisma.usuario.findFirst({ where: { tenantId: current.tenantId, telefone: data.telefone, id: { not: id } } });
+        if (exists) throw new BadRequestException('Telefone já em uso.');
+    }
+    if (data.nome && data.nome !== current.nome) {
+        const exists = await prisma.usuario.findFirst({ where: { tenantId: current.tenantId, nome: { equals: data.nome, mode: 'insensitive' }, id: { not: id } } });
+        if (exists) throw new BadRequestException(`Nome "${data.nome}" já existe.`);
+    }
+
+    return await prisma.usuario.update({
+        where: { id },
+        data: {
+            nome: data.nome,
+            email: data.email,
+            telefone: data.telefone
+        }
+    });
+  }
+  // ------------------------------
 
   async remove(id: string) {
-    // Limpa agendamentos e bloqueios antes de apagar o profissional
     await prisma.agendamento.deleteMany({ where: { profissionalId: id } });
     await prisma.bloqueio.deleteMany({ where: { profissionalId: id } });
-    
-    return await prisma.usuario.delete({
-      where: { id },
-    });
+    return await prisma.usuario.delete({ where: { id } });
   }
 }
