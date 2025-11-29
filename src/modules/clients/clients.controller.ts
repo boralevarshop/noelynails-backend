@@ -1,16 +1,9 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Delete, Body } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 
 @Controller('clients')
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
-
-  // --- O QUE FALTAVA ESTÁ AQUI ---
-  @Post()
-  create(@Body() data: any) {
-    return this.clientsService.create(data);
-  }
-  // ------------------------------
 
   @Get('tenant/:tenantId')
   findAll(@Param('tenantId') tenantId: string) {

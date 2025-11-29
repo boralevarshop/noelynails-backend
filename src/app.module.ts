@@ -1,11 +1,33 @@
 import { Module } from '@nestjs/common';
-// ... outros imports ...
-import { ClientsModule } from './modules/clients/clients.module'; // <--- TEM QUE TER ISSO
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { HttpModule } from '@nestjs/axios';
+
+// Imports dos Módulos
+import { AuthModule } from './modules/auth/auth.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
+import { UsersModule } from './modules/users/users.module';
+import { ServicesModule } from './modules/services/services.module';
+import { ProfessionalsModule } from './modules/professionals/professionals.module';
+import { ClientsModule } from './modules/clients/clients.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { BlocksModule } from './modules/blocks/blocks.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
-    // ... outros módulos ...
-    ClientsModule, // <--- TEM QUE ESTAR AQUI NA LISTA
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    HttpModule,
+    AuthModule,
+    TenantsModule,
+    UsersModule,
+    ServicesModule,
+    ProfessionalsModule,
+    ClientsModule,
+    AppointmentsModule,
+    BlocksModule,
+    BillingModule
   ],
   controllers: [],
   providers: [],
