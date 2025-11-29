@@ -33,9 +33,7 @@ export class TenantsService {
         where: { slug },
         select: {
             id: true, nome: true, slug: true, telefone: true,
-            // TODAS AS CORES
-            corPrimaria: true, corSecundaria: true, corTerciaria: true, corTexto: true, 
-            
+            corPrimaria: true, corSecundaria: true, corTerciaria: true, corTexto: true, // Cores
             logoUrl: true, ativo: true, agendamentoOnline: true, segmento: true
         }
     });
@@ -56,13 +54,8 @@ export class TenantsService {
 
     const dadosAtualizar: any = {
         nome: data.nome, slug: data.slug, telefone: data.telefone,
-        
-        // Cores (Incluindo Texto)
-        corPrimaria: data.corPrimaria, 
-        corSecundaria: data.corSecundaria,
-        corTerciaria: data.corTerciaria,
-        corTexto: data.corTexto, // <--- NOVO
-
+        corPrimaria: data.corPrimaria, corSecundaria: data.corSecundaria, 
+        corTerciaria: data.corTerciaria, corTexto: data.corTexto,
         segmento: data.segmento, whatsappInstance: data.whatsappInstance,
         agendamentoOnline: data.agendamentoOnline, plano: data.plano,
         statusAssinatura: data.statusAssinatura, trialFim: data.trialFim,
