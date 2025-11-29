@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -6,47 +6,63 @@ const prisma = new PrismaClient();
 @Injectable()
 export class ClientsService {
   
-  async findAllByTenant(tenantId: string) {
-    return await prisma.cliente.findMany({
-      where: { tenantId },
-      orderBy: { nome: 'asc' },
+  async create(data: any) {
+    return await prisma.cliente.create({
+      data: {
+        nome: data.nome,
+        telefone: data.telefone,
+        email: data.email,
+        tenantId: data.tenantId,
+      },
     });
   }
 
-  async update(id: string, data: any) {
-    if (data.telefone) {
-        const existe = await prisma.cliente.findFirst({
-            where: { 
-                telefone: data.telefone, 
-                tenantId: data.tenantId,
-                id: { not: id } 
-            }
-        });
-        if (existe) {
-            throw new BadRequestException('Já existe outro cliente com este telefone.');
+  // --- ATUALIZADO: TRAZ O HISTÓRICO ---
+  async findAllByTenant(tenantId: string) {
+    return await prisma.cliente.findMany({
+      where: { tenantId },
+      include: {
+        agendamentos: {
+          orderBy: { dataHora: 'desc' }, // Do mais novo pro mais velho
+          include: {
+            servico: true,
+            profissional: true
+          }
         }
-    }
+      },
+      orderBy: { nome: 'asc' }
+    });
+  }
+  // ------------------------------------
 
+  async findOne(id: string) {
+    return await prisma.cliente.findUnique({ where: { id } });
+  }
+
+  async update(id: string, data: any) {
     return await prisma.cliente.update({
       where: { id },
       data: {
         nome: data.nome,
         telefone: data.telefone,
-        email: data.email
-      }
+        email: data.email,
+      },
     });
   }
 
-  // --- CORREÇÃO: FORÇAR EXCLUSÃO ---
   async remove(id: string) {
-    // 1. Apaga TODO o histórico de agendamentos desse cliente primeiro
-    await prisma.agendamento.deleteMany({
-        where: { clienteId: id }
+    // Verifica se tem agendamentos antes de deletar
+    const cliente = await prisma.cliente.findUnique({
+        where: { id },
+        include: { _count: { select: { agendamentos: true } } }
     });
 
-    // 2. Agora o cliente está livre para ser excluído
-    return await prisma.cliente.delete({
-      where: { id }
-    });
+    if (cliente && cliente._count.agendamentos > 0) {
+        // Opcional: Poderíamos deletar os agendamentos ou impedir.
+        // Por segurança, vamos deletar os agendamentos primeiro (Cascata manual)
+        await prisma.agendamento.deleteMany({ where: { clienteId: id } });
+    }
+
+    return await prisma.cliente.delete({ where: { id } });
   }
 }
